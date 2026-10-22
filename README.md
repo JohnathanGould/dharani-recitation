@@ -1,8 +1,7 @@
 # Dhāraṇī Recitation
 
 A web app for learning the Great Compassionate Dhāraṇī (Nīlakaṇṭha Dhāraṇī) well enough to recite it
-from memory. It teaches the 70 verses of a printed study document, in IAST, with notes on where Lokesh
-Chandra's 1988 reconstruction reads differently.
+from memory. It teaches the 70 verses of a printed study document, in IAST, exactly as printed.
 
 It installs on a phone or computer, works offline after the first visit, and keeps your progress on
 your device.
@@ -11,13 +10,12 @@ your device.
 
 - **Learn**: every verse with pronunciation, word-by-word meanings and English. Long vowels are
   underlined and doubled consonants dotted, because holding them is most of what makes spoken Sanskrit
-  sound right. Lines that repeat (verses 3 and 69, 19 and 48) or start the same way (22 and 27, 38 and
-  39) carry a warning, and the svāhā offerings link back to the epithets they echo in the mantra.
+  sound right.
   Tap any Sanskrit word to highlight the English it becomes, or tap the English to find its Sanskrit.
 - **Practice**: spaced repetition, one verse at a time. By default the cue is the verse before (with
   more lines when one line is not enough to tell where you are), and you **say** the verse aloud,
   reveal it, and rate yourself Missed, Shaky or Got it. You can also type answers, which are graded
-  word by word and accept plain letters and common respellings. Record yourself to hear how you sounded. A hint shows the English meaning with the first letters.
+  word by word against your document's text and accept plain letters and common respellings. Record yourself to hear how you sounded. A hint shows the English meaning with the first letters.
   After each verse, a **translation check** asks what it means: translate it (typed or in your head),
   then compare with the English and the word-by-word meanings and rate yourself. Typed translations get a
   rough check of which key words they cover. It can be turned off, and is skipped when the cue was the meaning.
@@ -29,8 +27,7 @@ your device.
 - **Recite**: *Build the chain* recites from a start verse to the end of your chain; a clean recital adds
   the next verse. Recitals are timed, you mark the verses you stumbled on, and the app shows where you
   stumble most and lets you practise that step.
-- **Spelling**, **Sounds**, **Sources**: your current mistakes, a guide to the IAST marks, and notes on
-  the text.
+- **Spelling**, **Sounds**: your current mistakes, and a guide to the IAST marks.
 
 ## Your progress
 

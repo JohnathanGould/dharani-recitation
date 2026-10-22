@@ -13,7 +13,7 @@ const S = () => store.S;
 /* ---------- Helpers on verses ---------- */
 const byId = id => V.find(v => v.id === id);
 const partsOf = sk => sk.split(/\s+/).flatMap(w => w.split('-')).filter(Boolean);
-const readings = v => [{text: v.sk, label: 'document'}].concat((v.alts || []).map(t => ({text: t, label: 'variant'})));
+const readings = v => [{text: v.sk, label: 'document'}];
 const $ = sel => document.querySelector(sel);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 const hy = t => esc(t).replace(/-/g, '<span class="hy">-</span>');
@@ -58,17 +58,6 @@ function lightUp(box, idxs) {
 
 const levelLabel = {new: 'New', learning: 'Learning', known: 'Known'};
 
-/* Lines that repeat word for word, and lines that start the same way. */
-const REPEATS = {}, SAME_START = {};
-const start2 = v => v.sk.split(' ').slice(0, 2).join(' ');
-V.forEach(v => V.forEach(w => {
-  if (w.id === v.id) return;
-  if (w.sk === v.sk) (REPEATS[v.id] = REPEATS[v.id] || []).push(w.id);
-  else if (start2(w) === start2(v) && v.sk.split(' ').length > 2 && w.sk.split(' ').length > 2) (SAME_START[v.id] = SAME_START[v.id] || []).push(w.id);
-}));
-/* The svāhā offerings call back to epithets from the mantra. */
-const ECHOES = {53: [24, 46], 54: [46], 55: [33, 43], 56: [31], 57: [44], 58: [24], 59: [29], 60: [30], 64: [44], 66: [49]};
-
 /* The verses that come before v, enough of them that the cue points to only one place in the text. */
 function contextFor(v) {
   const key = (id, k) => V.slice(id - 1 - k, id - 1).map(x => x.sk).join('|');
@@ -78,19 +67,6 @@ function contextFor(v) {
     if (!V.some(w => w.id !== v.id && w.id - 1 - k >= 0 && key(w.id, k) === mine)) return V.slice(v.id - 1 - k, v.id - 1);
   }
   return V.slice(Math.max(0, v.id - 4), v.id - 1);
-}
-function repeatNote(v) {
-  const r = REPEATS[v.id], s = SAME_START[v.id];
-  const around = id => { const p = byId(id - 1), n = byId(id + 1); return (p ? 'after <i>' + esc(p.sk) + '</i>' : 'at the start') + (n ? ', before <i>' + esc(n.sk) + '</i>' : ', at the end'); };
-  let h = '';
-  if (r) h += '<p class="rep"><b>Watch out: this line appears again as verse ' + r.join(', ') + '.</b> Here it comes ' + around(v.id) + '. ' +
-    r.map(id => 'As verse ' + id + ' it comes ' + around(id) + '.').join(' ') + '</p>';
-  if (s) h += '<p class="rep"><b>Starts like verse ' + s.join(', ') + '</b> (<i>' + esc(byId(s[0]).sk) + '</i>). Here it goes on with <i>' + esc(v.sk.split(' ').slice(2).join(' ')) + '</i>.</p>';
-  return h;
-}
-function echoNote(v) {
-  const e = ECHOES[v.id]; if (!e) return '';
-  return '<p class="echo">Echoes the mantra: ' + e.map(id => '<a href="#learn/' + id + '">verse ' + id + '</a> <i>' + esc(byId(id).sk) + '</i>').join(' · ') + '</p>';
 }
 function fmtWait(ms) {
   if (ms < 3.6e6) return Math.max(1, Math.round(ms / 6e4)) + ' minutes';
@@ -150,17 +126,13 @@ function tilesHTML(sk) {
 function leafHTML(v, opts) {
   opts = opts || {};
   const lvl = levelOf(v.id), sh = S().show;
-  const others = readings(v).slice(1).map(r => '<span lang="sa-Latn">' + hy(r.text) + '</span>');
   return '<article class="leaf" data-level="' + lvl + '" id="line-' + v.id + '" data-verse="' + v.id + '">' +
     '<div class="leaf-top"><span>Verse ' + v.id + '</span><span>' + levelLabel[lvl] + (store.meaningLevel(v.id) === 'known' ? ' · can translate' : '') + '</span></div>' +
     '<p class="sk" lang="sa-Latn">' + tapSk(v, sh.len) + '</p>' +
     (sh.pron ? '<p class="pron">' + esc(pronText(v.sk)) + '</p>' : '') +
     (sh.en ? '<p class="en">' + tapEn(v) + '</p>' : '') + '<p class="tapgloss" aria-live="polite"></p>' +
-    repeatNote(v) + echoNote(v) +
     (v.lc ? '<p class="note">Translation uncertain: some words here are obscure.</p>' : '') +
     (sh.words ? tilesHTML(v.sk) : '') +
-    (v.note ? '<p class="note">' + esc(v.note) + '</p>' : '') +
-    (others.length ? '<p class="alt">Also read as: ' + others.join(' · ') + '</p>' : '') +
     (opts.noActions ? '' : recBar('learn-' + v.id, 'Record yourself reading it') +
       '<div class="actions"><button class="btn quiet" data-act="practice-line" data-id="' + v.id + '">Practice this verse</button></div>' +
       '<div class="chips" style="margin:10px 0 0"><span class="small muted">Mark as:</span>' + [['new', 'New'], ['learning', 'Learning'], ['known', 'Known']].map(x => '<button class="chip" data-act="set-level" data-id="' + v.id + '" data-lv="' + x[0] + '" aria-pressed="' + (lvl === x[0]) + '">' + x[1] + '</button>').join('') + '</div>') +
@@ -170,7 +142,7 @@ function viewLearn() {
   const chip = (k, label) => '<button class="chip" data-act="toggle-show" data-k="' + k + '" aria-pressed="' + S().show[k] + '">' + label + '</button>';
   let body = '', cur = 0;
   V.forEach(v => { if (v.sec !== cur) { cur = v.sec; body += '<h3 class="sec">' + esc(SECTIONS[cur]) + '</h3>'; } body += leafHTML(v); });
-  return '<details class="about"><summary>About this text</summary><p>This is the text from your printed study document, taught exactly as printed. It is the longer version of the Nīlakaṇṭha Dhāraṇī, written in IAST, the scholarly way of spelling Sanskrit with marks such as ā, ś and ṛ. Under many verses you will see where Lokesh Chandra\'s 1988 reconstruction reads differently. Those other readings are accepted when you practice. See the Sources tab.</p></details>' +
+  return '<details class="about"><summary>About this text</summary><p>This is the text from your printed study document, taught exactly as printed: the longer version of the Nīlakaṇṭha Dhāraṇī, written in IAST, the scholarly way of spelling Sanskrit with marks such as ā, ś and ṛ. Verses marked "translation uncertain" contain words that are obscure even to scholars.</p></details>' +
     '<div class="chips"><span class="small muted">Show:</span>' + chip('len', 'Long sounds') + chip('pron', 'Pronunciation') + chip('words', 'Word by word') + chip('en', 'English') + '</div>' +
     '<p class="small muted" style="margin:-6px 0 8px">Tap any Sanskrit word to see the English it becomes, or tap the English to find its Sanskrit.</p>' +
     (S().show.len ? '<p class="small muted" style="margin:-6px 0 14px">Underlined: long vowels, held about twice as long. Dotted: doubled consonants, held one beat. See the Sounds tab.</p>' : '') +
@@ -261,8 +233,7 @@ function viewPractice() {
   }
   if (P.stage === 'reveal') {
     return bar + head + '<div class="card"><p class="prompt-label">The verse</p><div class="res" lang="sa-Latn">' + marked(v.sk, null, true) + '</div>' +
-      '<p class="pron">' + esc(pronText(v.sk)) + '</p>' + (willTranslate(it) ? '' : '<p class="en">' + esc(v.en) + '</p>') + repeatNote(v) +
-      (readings(v).length > 1 ? '<p class="alt">Also accepted: ' + readings(v).slice(1).map(r => '<span lang="sa-Latn">' + hy(r.text) + '</span>').join(' · ') + '</p>' : '') +
+      '<p class="pron">' + esc(pronText(v.sk)) + '</p>' + (willTranslate(it) ? '' : '<p class="en">' + esc(v.en) + '</p>') +
       recBar('p-' + v.id) +
       '<p class="prompt-label" style="margin-top:14px">How did it go?</p><div class="rate"><button class="btn miss" data-act="rate" data-o="miss">Missed</button><button class="btn close" data-act="rate" data-o="close">Shaky</button><button class="btn perfect" data-act="rate" data-o="perfect">Got it</button></div>' +
       '<p class="small muted" style="margin:8px 0 0">Got it: every word, in order, with long sounds held. Shaky: you got there, with pauses or a slip.</p></div>';
@@ -275,8 +246,7 @@ function viewPractice() {
     (g.gaveUp ? '' : '<div class="legend"><span><i style="background:var(--good-soft)"></i>matched</span><span><i style="background:var(--warn-soft)"></i>nearly</span><span><i style="background:var(--bad-soft)"></i>missed</span></div>') +
     (g.gaveUp || !P.typed.trim() ? '' : '<p class="typed">You typed: ' + esc(P.typed) + '</p>') +
     (g.extra ? '<p class="small muted" style="margin:0 0 6px">Every word matched, but you typed extra letters or words around the verse.</p>' : '') +
-    (!g.gaveUp && g.label === 'variant' && g.outcome !== 'miss' ? '<p class="small muted" style="margin:0 0 6px">This matched another accepted reading.</p>' : '') +
-    '<p class="pron">' + esc(pronText(shown)) + '</p>' + (willTranslate(it) ? '' : '<p class="en">' + esc(v.en) + '</p>') + repeatNote(v) +
+    '<p class="pron">' + esc(pronText(shown)) + '</p>' + (willTranslate(it) ? '' : '<p class="en">' + esc(v.en) + '</p>') +
     (g.said ? '<p class="small muted" style="margin:10px 0 0">Said aloud: ' + {perfect: 'got it', close: 'shaky', miss: 'missed'}[g.said] + ' · Written: ' + {perfect: 'perfect', close: 'close', miss: 'not yet'}[g.outcome] + '. Scheduled by the weaker of the two.</p>' : '') +
     '<p class="small muted" style="margin:10px 0 12px">Next review in ' + fmtWait(P.wait) + (g.outcome === 'miss' ? '. It will come back at the end of this session.' : '.') + '</p>' +
     '<div class="row"><button class="btn primary" id="next" data-act="next">' + (willTranslate(it) ? 'Translate it' : P.idx + 1 >= P.queue.length ? 'Finish' : P.queue[P.idx + 1].drill ? 'Try writing it again' : 'Next verse') + '</button></div></div>';
@@ -548,42 +518,8 @@ function viewSounds() {
     '<div class="sound-grid">' + items.map(i => '<div class="snd"><div class="g" lang="sa-Latn">' + esc(i[0]) + '</div><div class="d">' + esc(i[1]) + '</div><div class="e" lang="sa-Latn">' + esc(i[2]) + '</div></div>').join('') + '</div>';
 }
 
-/* ---------- Sources ---------- */
-function viewSources() {
-  const row = (head, a, b, t) => '<div class="fix"><div class="head"><span class="badge var">' + head + '</span></div><p><b>Your document:</b> <span lang="sa-Latn" style="font-family:var(--serif)">' + esc(a) + '</span><br><b>Chandra:</b> <span lang="sa-Latn" style="font-family:var(--serif)">' + esc(b) + '</span></p><p class="muted">' + esc(t) + '</p></div>';
-  const link = (u, t) => '<a href="' + u + '" target="_blank" rel="noopener">' + t + '</a>';
-  return '<div class="card src"><h2>What this app teaches</h2><p>Your printed study document, line by line, exactly as printed. It was checked against the longer reconstruction by Lokesh Chandra (1988), as quoted on ' + link('https://kinhsach.wordpress.com/2019/12/30/hoc-chu-dai-bi-tieng-phan-the-great-compassion-dharani-mantra-sound-listening/', 'this page') + ' and ' + link('https://essenceofbuddhism.wordpress.com/2018/03/02/the-great-compassion-mantra-in-sanskrit/', 'this one') + ' (both trace to the same Wikipedia section, so they count as one source). The two texts have the same structure and mostly the same words, so your document is a real version of the longer dhāraṇī. It is not the shorter 84-line version used in many temples.</p>' +
-    '<p>Where your document came from, and whether it is the only correct text, could not be confirmed. No single canonical Sanskrit exists. Where it differs from Chandra both readings are accepted when you practice, and the notes under each verse say what differs.</p></div>' +
-    '<div class="card src"><h2>Where your document differs from Chandra</h2>' +
-    row('Verses 4 and 5', 'sarva bandhana chedana-karāya / samudraṃ', 'sarva-bandhana-cchedana-karāya / samudra', 'Spelling and the nasal ṃ. Both are attested, and neither changes the meaning.') +
-    row('Verse 7', 'mṛtyu upadrava', 'sarv-ety-upadrava', 'Mṛtyu ("death") is the chant reading. Chandra reads ety ("calamity").') +
-    row('Verses 9 and 10', 'tasmān namas-kṛtvā idam / nīlakaṇṭhaṃ api nāma hṛdayam', 'tasmai namaskṛtvā imaṃ / nīlakaṇṭha-nāma, then hṛdayaṃ vartayiṣyāmi', 'Both are grammatical. Your document has the chant wording and moves hṛdayam to the end of the line.') +
-    row('Verse 17', 'hi hi hare … parama-maitra-citta', 'ehy-ehi hare … paramārtha-citta', 'The ending ("of kind mind" versus "of highest-truth mind") is a real difference.') +
-    row('Verses 20 to 24', 'dhuru dhuru vīryanti … cala cala vimala amala mūrte / āryāvalokiteśvara jina kṛṣṇa-jaṭā-makuṭa-valam / mā pralamba', 'dhuru-dhuru viyanta e … cala-cala vimal-āmala āryāvalokiteśvara jina / kṛṣṇa-jaṭā-makuṭā \'varama prarama virama', 'Chandra\'s words here are obscure. Your document seems to read them as more regular Sanskrit (vīryanti, mā pralamba), which could not be checked against a manuscript.') +
-    row('Verses 25 to 27', 'vara vara mahāvara / bala bala mahābala / cala cala mahācala', 'bala-bala mahābala malla-malla mahāmalla cala-cala mahācala', 'Your document adds vara vara mahāvara and leaves out malla-malla mahāmalla.') +
-    row('Verse 29', 'deśa-careśvara', 'niśācareśvara', '"Lord of those who roam the lands" versus "lord of night-roamers".') +
-    row('Verse 32', 'nārāyaṇa-varūpa vara-mārga-ari', 'nārāyaṇa-balopabala-veśa-dhara', 'The second half of the line is quite different.') +
-    row('Verses 38 to 41', 'huru huru māla / śrī śrī / suru suru bhūru bhūru', 'hulu-hulu malla / siri-siri suru-suru muru-muru', 'Mostly sound syllables, so small differences are expected.') +
-    row('Verse 46', 'ehyehi pa mahāsiddha-yogeśvara', 'ehy-ehi bho mahāsiddha-yogeśvara', 'Pa is unexplained. Bho ("O!") is probably what is meant.') +
-    row('Verses 57 to 64', 'mahādara-siṃhamukhāya / cakrayuddhāya / śaṅkha-śabdāni bodhanāya / kṛṣṇa-jināya', 'mahā-narasiṃha-mukhāya / cakr-āyudhāya / śaṅkha-śabda-nibodhanāya / kṛṣṇ-ājināya', 'Several of these look like small copying changes.') + '</div>' +
-    '<div class="card src"><h2>Where your document\'s English needs a second look</h2><ul>' +
-    '<li><b>Verse 20 (vīryanti):</b> not found as a Sanskrit word, so "sustain great courage and energy" may be a guess.</li>' +
-    '<li><b>Verse 21 (dharendreśvara):</b> "bearer of the Dharma" is not in the word. It literally says "lord of the earth-bearers".</li>' +
-    '<li><b>Verse 27 (mahācala):</b> "unshakable" would be acala. Cala means "moving".</li>' +
-    '<li><b>Verse 34 (hala hala viṣa):</b> Chandra reads halāhala-viṣa, the name of the deadly poison in the Śiva story.</li>' +
-    '<li><b>Verse 61 (mahālakūṭadhara):</b> "bearer of the poison" does not fit. Chandra\'s lakuṭa means "staff".</li>' +
-    '<li><b>Verse 62 (cakrayuddhāya):</b> yuddha means "battle", so this was probably meant as cakr-āyudhāya ("weapon: the wheel").</li>' +
-    '<li><b>Verse 64 (kṛṣṇa-jināya):</b> Chandra\'s ajina would mean "black antelope skin", not "victorious".</li></ul>' +
-    '<p class="muted">Those verses are marked "translation uncertain" in the Learn tab. The Sanskrit of your document is kept exactly, and translated carefully from the words themselves.</p></div>' +
-    '<div class="card src"><h2>What could not be verified</h2><ul><li>Chandra\'s book, the Peking palace manuscripts and the Taishō texts were not available. Everything here comes from web pages quoting them.</li>' +
-    '<li>Who made your document, or which source it follows, is unknown. Its Sanskrit is a mix of Chandra\'s wording, chant wording and a few readings that could not be traced.</li>' +
-    '<li>Some words are obscure even to scholars (dhuru, viyanta, hulu, suru and others).</li>' +
-    '<li>The pronunciation lines in this app are generated by a rule-based respelling, not recorded, so they differ a little from the pronunciation lines in your document.</li></ul>' +
-    '<p class="muted">Other pages consulted: ' + link('https://astr.ac.cn/note/2304/', 'astr.ac.cn') + ' (the shorter 84-line text), ' + link('https://fr.wikipedia.org/wiki/Nilakantha_Dharani', 'French Wikipedia') + ' and ' + link('https://en.wikipedia.org/wiki/N%C4%ABlaka%E1%B9%87%E1%B9%ADha_Dh%C4%81ra%E1%B9%87%C4%AB', 'English Wikipedia') + '. Please check the text against your teacher\'s or tradition\'s version.</p></div>';
-}
-
 /* ---------- Render and routing ---------- */
-const VIEWS = {learn: viewLearn, practice: viewPractice, words: viewWords, recite: viewRecite, spelling: viewSpelling, sounds: viewSounds, sources: viewSources};
+const VIEWS = {learn: viewLearn, practice: viewPractice, words: viewWords, recite: viewRecite, spelling: viewSpelling, sounds: viewSounds};
 function render() {
   renderTabs(); renderMeter();
   $('#view').innerHTML = VIEWS[tab]();

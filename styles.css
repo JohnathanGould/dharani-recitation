@@ -168,11 +168,6 @@ h3.sec { font-size: .78rem; letter-spacing: .12em; text-transform: uppercase; co
 /* web app additions */
 .long { box-shadow: inset 0 -.18em 0 var(--accent-soft); border-bottom: 2px solid var(--accent); }
 .gem { border-bottom: 2px dotted var(--warn); }
-.rep, .echo { margin: 8px 0 0; font-size: .86rem; max-width: 62ch; padding: 8px 10px; border-radius: 6px; }
-.rep { background: var(--warn-soft); color: var(--ink); }
-.echo { background: var(--accent-soft); color: var(--ink); }
-.rep i, .echo i { font-family: var(--serif); font-style: normal; }
-.echo a { font-weight: 600; }
 .ctx { font-family: var(--serif); color: var(--ink-2); font-size: clamp(1.05rem, 3.8vw, 1.25rem); margin: 0 0 2px; overflow-wrap: anywhere; }
 .ctx.last { color: var(--ink); font-size: clamp(1.25rem, 4.6vw, 1.6rem); margin-bottom: 12px; }
 .say { border: 1px dashed var(--rule); border-radius: 8px; padding: 18px 14px; text-align: center; color: var(--ink-2); margin-bottom: 10px; }

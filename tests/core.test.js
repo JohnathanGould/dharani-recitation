@@ -24,9 +24,10 @@ test('common respellings are accepted in lenient mode', () => {
   assert.equal(gradeSeq('sarva bhava samoodram shoshana karaya', one(v), false).exact, true);
 });
 
-test('alternate readings are accepted', () => {
-  const v = DOC[6]; // mṛtyu, or Chandra's sarv-ety-upadrava
-  assert.equal(gradeSeq('sarv ety upadrava vinasana karaya', one(v), false).exact, true);
+test('only the reading in the document is accepted', () => {
+  const v = DOC[6]; // sarva mṛtyu upadrava vināśana-karāya
+  assert.equal(gradeSeq('sarva mrtyu upadrava vinasana karaya', one(v), false).exact, true);
+  assert.equal(gradeSeq('sarv ety upadrava vinasana karaya', one(v), false).exact, false);
 });
 
 test('a missing word is marked as missed', () => {
