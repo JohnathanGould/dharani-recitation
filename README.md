@@ -22,8 +22,8 @@ your device.
   After each verse, a **translation check** asks what it means: translate it (typed or in your head),
   then compare with the English and the word-by-word meanings and rate yourself. Typed translations get a
   rough check of which key words they cover. It can be turned off, and is skipped when the cue was the meaning.
-  **Practice this verse** (on any verse) drills one verse in two steps: say it aloud and rate yourself,
-  then write it from memory and have it graded. The two count as one review, scheduled by the weaker.
+  **Practice this verse** (on any verse) drills one verse on one card: say it aloud, write it from memory
+  and have it graded, then rate how saying it went. The two count as one review, scheduled by the weaker.
 - **Words**: a word learner with two decks. *Building blocks* are the 54 roots that recur (mahā = great,
   sarva = all, īśvara = lord…); *Words in the text* are the full glossed words. Multiple-choice quizzes in
   either direction, with their own spaced review, and every card shows the verses it appears in.
@@ -54,7 +54,8 @@ Any static web server works. The service worker needs `http://localhost` or HTTP
 `.github/workflows/pages.yml` runs the tests and deploys to GitHub Pages on every push to `main`.
 Turn Pages on once under **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 
-When you change any app file, bump `VERSION` in `sw.js` so installed copies pick up the change.
+When online, the app always loads its newest files, so a deploy shows on the next open. When you change
+which files the app uses, update the list in `sw.js` and bump its `VERSION`.
 
 ## Files
 

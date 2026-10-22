@@ -103,7 +103,7 @@ const seg = (act, cur, opts, label) => '<div class="seg" role="group" aria-label
 
 /* ---------- Session state ---------- */
 let tab = 'learn';
-const P = {active: false, queue: [], idx: 0, stage: 'recall', hint: 0, results: [], typed: '', outcome: null, wait: 0, flash: '', drillSaid: null, trShown: false, trText: '', meanings: [], confirmReset: false, confirmClear: false};
+const P = {active: false, queue: [], idx: 0, stage: 'recall', hint: 0, results: [], typed: '', outcome: null, wait: 0, flash: '', trShown: false, trText: '', meanings: [], confirmReset: false, confirmClear: false};
 const R = {mode: 'chain', from: 1, to: 8, hints: false, phase: 'ready', t0: 0, ms: 0, text: '', result: null, stumbled: new Set(), saved: false};
 let timerId = null, lastFx = null;
 
@@ -176,15 +176,15 @@ function newIds() {
 }
 function startSession(ids, all) {
   const queue = ids.map(id => ({id, isNew: !(S().lines[id] && S().lines[id].seen) && !all, retry: false}));
-  Object.assign(P, {active: true, queue, idx: 0, results: [], flash: '', drillSaid: null, meanings: []});
+  Object.assign(P, {active: true, queue, idx: 0, results: [], flash: '', meanings: []});
   setStageForCurrent();
   go('practice');
 }
-/* Practice this verse: say it aloud and rate yourself, then write it from memory.
-   The two count as one review, scheduled by the weaker of the two. */
+/* Practice this verse: say it aloud, then write it from memory on the same card. The writing is
+   graded, you rate how saying it went, and the two count as one review, scheduled by the weaker. */
 function startDrill(id) {
-  const queue = [{id, mode: 'say', drill: true, retry: false}, {id, mode: 'write', drill: true, retry: false}];
-  Object.assign(P, {active: true, queue, idx: 0, results: [], flash: '', drillSaid: null, meanings: []});
+  const queue = [{id, mode: 'write', drill: true, retry: false}];
+  Object.assign(P, {active: true, queue, idx: 0, results: [], flash: '', meanings: []});
   setStageForCurrent();
   go('practice');
 }
@@ -226,7 +226,7 @@ function viewPractice() {
       '<div class="row"><button class="btn primary" data-act="finish">Done</button><button class="btn" data-act="go-recite">Try a full recital</button></div></div>';
   }
   const it = P.queue[P.idx], v = byId(it.id), say = it.mode ? it.mode === 'say' : S().answer === 'say';
-  const step = it.drill && !it.retry ? ' · step ' + (it.mode === 'say' ? '1 of 2: say it' : '2 of 2: write it') : '';
+  const step = ' · say it, then write it';
   const bar = '<div class="bar" aria-hidden="true"><i style="width:' + Math.round(P.idx / P.queue.length * 100) + '%"></i></div>';
   const head = (P.flash ? '<p class="flash">' + esc(P.flash) + '</p>' : '') + '<div class="row" style="justify-content:space-between;margin:0 0 8px"><span class="small muted">Verse ' + v.id + (it.drill ? step : ' · ' + (P.idx + 1) + ' of ' + P.queue.length) + (it.retry ? ' · second try' : '') + '</span><button class="btn quiet small" data-act="finish">End session</button></div>';
   const switches = '<div class="row" style="margin-top:4px">' + (it.drill ? '' : seg('answer', S().answer, [['say', 'Say it'], ['type', 'Type it']], 'Answer by')) + seg('prompt', S().prompt, [['prev', 'Verse before'], ['meaning', 'Meaning']], 'Cue') + '</div>';
@@ -242,7 +242,9 @@ function viewPractice() {
     if (say) return bar + head + '<div class="card">' + promptHTML(v) +
       '<div class="say">Say the ' + what + ' aloud, then reveal it.</div>' + recBar('p-' + v.id) + hint +
       '<div class="row"><button class="btn primary" data-act="reveal">Reveal</button>' + hintBtn + '</div></div>' + switches;
-    return bar + head + '<div class="card">' + promptHTML(v) + '<p class="prompt-label">' + (it.drill ? 'Write the ' : 'Type the ') + what + (it.drill ? ' from memory' : '') + '</p>' +
+    return bar + head + '<div class="card">' + promptHTML(v) +
+      (it.drill ? '<div class="say">Say the ' + what + ' aloud first, then write it below.</div>' + recBar('p-' + v.id) : '') +
+      '<p class="prompt-label">' + (it.drill ? 'Write the ' : 'Type the ') + what + (it.drill ? ' from memory' : '') + '</p>' +
       '<textarea class="field" id="ans" rows="2" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Your answer">' + esc(P.typed) + '</textarea>' +
       keypad('ans') + hint +
       '<div class="row"><button class="btn primary" data-act="check">Check</button>' + hintBtn + '<button class="btn quiet" data-act="giveup">Show answer</button></div></div>' + switches;
@@ -263,9 +265,11 @@ function viewPractice() {
     (g.gaveUp || !P.typed.trim() ? '' : '<p class="typed">You typed: ' + esc(P.typed) + '</p>') +
     (g.extra ? '<p class="small muted" style="margin:0 0 6px">Every word matched, but you typed extra letters or words around the verse.</p>' : '') +
     '<p class="pron">' + esc(pronText(shown)) + '</p>' + '<div class="row" style="margin:6px 0">' + hearBtn('v', v.id, 'Hear it') + '</div>' + (willTranslate(it) ? '' : '<p class="en">' + esc(v.en) + '</p>') +
+    (g.awaitSay ? recBar('p-' + v.id) + '<p class="prompt-label" style="margin-top:14px">And saying it aloud?</p><div class="rate"><button class="btn miss" data-act="rate" data-o="miss">Missed</button><button class="btn close" data-act="rate" data-o="close">Shaky</button><button class="btn perfect" data-act="rate" data-o="perfect">Got it</button></div>' +
+      '<p class="small muted" style="margin:8px 0 0">Got it: every word, in order, with long sounds held. Shaky: you got there, with pauses or a slip.</p></div>' :
     (g.said ? '<p class="small muted" style="margin:10px 0 0">Said aloud: ' + {perfect: 'got it', close: 'shaky', miss: 'missed'}[g.said] + ' · Written: ' + {perfect: 'perfect', close: 'close', miss: 'not yet'}[g.outcome] + '. Scheduled by the weaker of the two.</p>' : '') +
     '<p class="small muted" style="margin:10px 0 12px">Next review in ' + fmtWait(P.wait) + (g.outcome === 'miss' ? '. It will come back at the end of this session.' : '.') + '</p>' +
-    '<div class="row"><button class="btn primary" id="next" data-act="next">' + (willTranslate(it) ? 'Translate it' : P.idx + 1 >= P.queue.length ? 'Finish' : P.queue[P.idx + 1].drill ? 'Try writing it again' : 'Next verse') + '</button></div></div>';
+    '<div class="row"><button class="btn primary" id="next" data-act="next">' + (willTranslate(it) ? 'Translate it' : P.idx + 1 >= P.queue.length ? 'Finish' : P.queue[P.idx + 1].drill ? 'Try writing it again' : 'Next verse') + '</button></div></div>');
 }
 /* Translation check: after recalling a verse, say what it means, then compare with the English.
    Skipped when the cue was the meaning itself, and on second tries. */
@@ -313,24 +317,25 @@ function doCheck(gaveUp) {
     pick = g.picks[0];
     outcome = g.exact ? 'perfect' : g.sim >= .9 ? 'close' : 'miss';
   }
-  const said = P.drillSaid; P.drillSaid = null;
+  const drill = P.queue[P.idx].drill;
   P.typed = val;
-  P.outcome = {marks: pick.marks, outcome, gaveUp: !!gaveUp, text: rds[pick.ci].text, label: rds[pick.ci].label, said,
+  P.outcome = {marks: pick.marks, outcome, gaveUp: !!gaveUp, text: rds[pick.ci].text, label: rds[pick.ci].label, awaitSay: drill,
     extra: !gaveUp && !g.exact && pick.marks.every(m => m === 'ok')};
   store.recordAttempt(v.id, pick.marks, rds[pick.ci].text, gaveUp ? '' : val, outcome === 'perfect', gaveUp ? 'gave up' : P.queue[P.idx].drill ? 'written practice' : 'typed practice');
-  P.wait = store.applyOutcome(v.id, said ? weaker(said, outcome) : outcome, P.hint > 0 ? 1 : 0);
+  // In a drill the review is scheduled once you have also rated saying it (see rate).
+  if (!drill) P.wait = store.applyOutcome(v.id, outcome, P.hint > 0 ? 1 : 0);
   finishItem(v, outcome);
   P.flash = ''; P.stage = 'result'; render();
 }
 async function rate(outcome) {
   const it = P.queue[P.idx], v = byId(it.id);
   if (rec.recording()) await rec.stop();
-  if (it.drill) {
-    // The spoken half of a drill is scheduled together with the written half that follows.
-    P.drillSaid = outcome;
-    P.flash = 'Said aloud: ' + {perfect: 'got it', close: 'shaky', miss: 'missed'}[outcome] + '. Now write it from memory.';
-    P.idx++; setStageForCurrent();
-    render(); window.scrollTo(0, 0);
+  if (it.drill && P.stage === 'result') {
+    // The spoken half of a drill: schedule the verse by the weaker of saying and writing it.
+    const g = P.outcome;
+    g.said = outcome; g.awaitSay = false;
+    P.wait = store.applyOutcome(v.id, weaker(outcome, g.outcome), P.hint > 0 ? 1 : 0);
+    render();
     return;
   }
   store.recordAttempt(v.id, null, v.sk, '', outcome === 'perfect', outcome === 'miss' ? 'said: missed' : 'said: shaky');
