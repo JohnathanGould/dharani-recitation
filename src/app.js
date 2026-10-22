@@ -3,6 +3,7 @@ import {pronWord, pronText, lengthHTML} from './pron.js';
 import {fold, gradeSeq} from './grade.js';
 import * as store from './store.js';
 import * as rec from './recorder.js';
+import {DECKS} from './words.js';
 
 const {DAY, INTERVALS, levelOf} = store;
 const V = DOC;
@@ -209,7 +210,8 @@ function viewPractice() {
   }
   if (P.stage === 'recall') {
     const what = S().prompt === 'meaning' ? 'verse' : v.id === 1 ? 'first verse' : 'next verse';
-    const hint = '<div class="hint" id="hint" aria-live="polite">' + esc(hintText(v, P.hint)) + '</div>';
+    const hint = (P.hint && S().prompt !== 'meaning' ? '<p class="en" style="margin:8px 0 0">' + esc(v.en) + '</p>' : '') +
+      '<div class="hint" id="hint" aria-live="polite">' + esc(hintText(v, P.hint)) + '</div>';
     const hintBtn = '<button class="btn" data-act="hint" ' + (P.hint >= 2 ? 'disabled style="opacity:.5"' : '') + '>Hint</button>';
     if (say) return bar + head + '<div class="card">' + promptHTML(v) +
       '<div class="say">Say the ' + what + ' aloud, then reveal it.</div>' + recBar('p-' + v.id) + hint +
@@ -285,6 +287,68 @@ async function rate(outcome) {
   P.flash = 'Verse ' + v.id + ': ' + {perfect: 'got it', close: 'shaky', miss: 'missed'}[outcome] + '. Next review in ' + fmtWait(wait) + (outcome === 'miss' ? ', and again at the end of this session.' : '.');
   P.idx++; if (P.idx < P.queue.length) setStageForCurrent();
   render(); window.scrollTo(0, 0);
+}
+
+/* ---------- Words ---------- */
+const W = {active: false, queue: [], idx: 0, options: [], answered: null, results: []};
+const deckOf = key => key.startsWith('b:') ? DECKS.blocks : DECKS.text;
+const cardBy = key => deckOf(key).cards.find(c => c.key === key);
+const pronOf = c => c.sk.split(' / ').map(pronWord).join(' / ');
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function dealCard() {
+  W.answered = null;
+  const it = W.queue[W.idx]; if (!it) return;
+  const c = cardBy(it.key);
+  const others = shuffle(deckOf(c.key).cards.filter(x => x.key !== c.key && x.en !== c.en && x.sk !== c.sk)).slice(0, 3);
+  W.options = shuffle([c].concat(others)).map(x => x.key);
+}
+function startWords(cards) {
+  Object.assign(W, {active: true, queue: cards.map(c => ({key: c.key, retry: false})), idx: 0, results: []});
+  dealCard(); go('words');
+}
+const wordDue = d => d.cards.filter(c => { const st = S().words[c.key]; return st && st.seen && st.due <= Date.now(); });
+const wordNew = d => d.cards.filter(c => !(S().words[c.key] && S().words[c.key].seen));
+function seenIn(c, max) {
+  return c.seen.slice(0, max).map(o => {
+    const v = byId(o.id), hits = new Set(o.hits);
+    return '<p class="ctx" lang="sa-Latn" style="margin:2px 0"><a href="#learn/' + v.id + '" class="small" style="font-family:var(--sans);margin-right:6px">' + v.id + '</a>' +
+      v.sk.split(' ').map(w => w.split('-').map(p => hits.has(p) ? '<mark class="hl">' + esc(p) + '</mark>' : esc(p)).join('<span class="hy">-</span>')).join(' ') + '</p>';
+  }).join('') + (c.seen.length > max ? '<p class="small muted" style="margin:2px 0">and ' + (c.seen.length - max) + ' more</p>' : '');
+}
+function viewWords() {
+  const d = DECKS[S().wordDeck], sk2en = S().wordDir === 'sk2en';
+  if (!W.active) {
+    const due = wordDue(d).length, nw = wordNew(d).length, known = d.cards.filter(c => store.wordLevel(c.key) === 'known').length;
+    const rows = d.cards.map(c => '<div class="wrow"><span class="lv" data-level="' + store.wordLevel(c.key) + '"></span><span><b lang="sa-Latn">' + esc(c.sk) + '</b> <span class="tp">' + esc(pronOf(c)) + '</span><br>' +
+      esc(c.en) + (c.note ? ' <span class="muted small">' + esc(c.note) + '</span>' : '') + ' <span class="muted small">· ' + c.seen.length + (c.seen.length === 1 ? ' verse' : ' verses') + '</span></span></div>').join('');
+    return '<div class="card"><h2>Word learner</h2><p class="muted small" style="margin:0 0 12px;max-width:62ch">Learn the words the dhāraṇī is made of. <b>Building blocks</b> are the roots that recur: once you know mahā is "great" and īśvara is "lord", mahākāruṇika and lokeśvara read themselves. <b>Words in the text</b> are the full words of your document, most frequent first.</p>' +
+      '<div class="row" style="margin-bottom:10px">' + seg('wdeck', S().wordDeck, [['blocks', 'Building blocks'], ['text', 'Words in the text']], 'Deck') + '</div>' +
+      '<div class="row" style="margin-bottom:14px">' + seg('wdir', S().wordDir, [['sk2en', 'Sanskrit → English'], ['en2sk', 'English → Sanskrit']], 'Direction') + '</div>' +
+      '<div class="stats"><div class="stat"><b>' + due + '</b><span>Due now</span></div><div class="stat"><b>' + nw + '</b><span>New</span></div><div class="stat"><b>' + known + ' / ' + d.cards.length + '</b><span>Known</span></div></div>' +
+      '<div class="row"><button class="btn primary" data-act="w-learn" ' + (due + nw ? '' : 'disabled style="opacity:.5"') + '>Learn words</button><button class="btn" data-act="w-all">Quiz 20 at random</button></div>' +
+      '<p class="small muted" style="margin:8px 0 0">Learn words: everything due, then up to 8 new ones.</p></div>' +
+      '<details class="card" ' + (d.cards.length <= 60 ? 'open' : '') + '><summary style="cursor:pointer;font-weight:600">All ' + d.cards.length + ' words in this deck</summary><div style="margin-top:10px">' + rows + '</div></details>';
+  }
+  if (W.idx >= W.queue.length) {
+    const right = W.results.filter(Boolean).length;
+    return '<div class="card"><h2>Done</h2><p>' + right + ' of ' + W.results.length + ' right first time.</p><div class="row"><button class="btn primary" data-act="w-end">Back to the word list</button></div></div>';
+  }
+  const it = W.queue[W.idx], c = cardBy(it.key), a = W.answered;
+  const bar = '<div class="bar" aria-hidden="true"><i style="width:' + Math.round(W.idx / W.queue.length * 100) + '%"></i></div>';
+  const head = '<div class="row" style="justify-content:space-between;margin:0 0 8px"><span class="small muted">Word ' + (W.idx + 1) + ' of ' + W.queue.length + (it.retry ? ' · second try' : '') + '</span><button class="btn quiet small" data-act="w-end">End</button></div>';
+  const front = sk2en
+    ? '<p class="prompt-label">What does it mean?</p><p class="sk" lang="sa-Latn" style="margin:0">' + esc(c.sk) + '</p><p class="pron">' + esc(pronOf(c)) + '</p>'
+    : '<p class="prompt-label">Which Sanskrit word means</p><p class="prompt-body" style="font-size:1.4rem">' + esc(c.en) + '</p>';
+  const opts = '<div class="opts">' + W.options.map(k => {
+    const o = cardBy(k), cls = a ? (k === c.key ? ' right' : k === a.pick ? ' wrong' : '') : '';
+    return '<button class="btn opt' + cls + '" data-act="w-pick" data-k="' + esc(k) + '"' + (a ? ' disabled' : '') + (sk2en ? '' : ' lang="sa-Latn"') + '>' + esc(sk2en ? o.en : o.sk) + '</button>';
+  }).join('') + '</div>';
+  const back = !a ? '' : '<div style="margin-top:14px"><span class="verdict ' + (a.right ? 'perfect' : 'miss') + '">' + (a.right ? 'Right' : 'Not quite') + '</span>' +
+    '<p style="margin:4px 0"><b lang="sa-Latn" style="font-family:var(--serif);font-size:1.2rem">' + esc(c.sk) + '</b> <span class="pron" style="display:inline">' + esc(pronOf(c)) + '</span> = ' + esc(c.en) + '</p>' +
+    (c.note ? '<p class="small muted" style="margin:0 0 6px">' + esc(c.note) + '</p>' : '') +
+    '<p class="prompt-label" style="margin-top:10px">In the dhāraṇī</p>' + seenIn(c, 3) +
+    '<div class="row" style="margin-top:12px"><button class="btn primary" id="next" data-act="w-next">' + (W.idx + 1 >= W.queue.length ? 'Finish' : 'Next word') + '</button></div></div>';
+  return bar + head + '<div class="card">' + front + opts + back + '</div>';
 }
 
 /* ---------- Recite ---------- */
@@ -453,7 +517,7 @@ function viewSources() {
 }
 
 /* ---------- Render and routing ---------- */
-const VIEWS = {learn: viewLearn, practice: viewPractice, recite: viewRecite, spelling: viewSpelling, sounds: viewSounds, sources: viewSources};
+const VIEWS = {learn: viewLearn, practice: viewPractice, words: viewWords, recite: viewRecite, spelling: viewSpelling, sounds: viewSounds, sources: viewSources};
 function render() {
   renderTabs(); renderMeter();
   $('#view').innerHTML = VIEWS[tab]();
@@ -505,7 +569,7 @@ document.addEventListener('click', async e => {
     case 'start': startSession(dueIds().concat(newIds()), false); break;
     case 'start-all': startSession(V.map(v => v.id), true); break;
     case 'cover': if (rec.recording()) await rec.stop(); P.stage = 'recall'; render(); break;
-    case 'hint': { keepTyped(); P.hint = Math.min(2, P.hint + 1); $('#hint').textContent = hintText(byId(P.queue[P.idx].id), P.hint); if (P.hint >= 2) { t.disabled = true; t.style.opacity = .5; } break; }
+    case 'hint': keepTyped(); P.hint = Math.min(2, P.hint + 1); render(); break;
     case 'reveal': if (rec.recording()) await rec.stop(); P.stage = 'reveal'; render(); break;
     case 'rate': await rate(t.dataset.o); break;
     case 'check': doCheck(false); break;
@@ -527,6 +591,21 @@ document.addEventListener('click', async e => {
       keepTyped(); render(); break;
     case 'rec-stop': await rec.stop(); keepTyped(); render(); break;
 
+    case 'wdeck': S().wordDeck = t.dataset.v; store.save(); render(); break;
+    case 'wdir': S().wordDir = t.dataset.v; store.save(); render(); break;
+    case 'w-learn': { const d = DECKS[S().wordDeck]; startWords(wordDue(d).concat(wordNew(d).slice(0, 8))); break; }
+    case 'w-all': startWords(shuffle(DECKS[S().wordDeck].cards.slice()).slice(0, 20)); break;
+    case 'w-pick': {
+      if (W.answered) break;
+      const it = W.queue[W.idx], right = t.dataset.k === it.key;
+      W.answered = {pick: t.dataset.k, right};
+      store.applyWord(it.key, right);
+      if (!it.retry) W.results.push(right);
+      if (!right && !it.retry) W.queue.push({key: it.key, retry: true});
+      render(); break;
+    }
+    case 'w-next': W.idx++; dealCard(); render(); scrollTo(0, 0); break;
+    case 'w-end': W.active = false; render(); scrollTo(0, 0); break;
     case 'rmode': R.mode = t.dataset.v; R.phase = 'ready'; R.result = null; R.savedMsg = ''; render(); break;
     case 'toggle-rhints': keepTyped(); R.hints = !R.hints; render(); break;
     case 'toggle-rrec': S().recRecital = !S().recRecital; store.save(); render(); break;

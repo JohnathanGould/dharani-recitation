@@ -46,3 +46,9 @@ test('long sounds are marked', () => {
   assert.equal(lengthHTML('cchedana', esc), '<span class="gem">cch</span><span class="long">e</span>dana');
   assert.equal(lengthHTML('maitrī', esc), 'm<span class="long">ai</span>tr<span class="long">ī</span>');
 });
+
+test('every word card is found somewhere in the text', async () => {
+  const {DECKS} = await import('../src/words.js');
+  for (const d of Object.values(DECKS)) for (const c of d.cards) assert.ok(c.seen.length > 0, c.sk + ' is not found in any verse');
+  assert.ok(DECKS.blocks.cards.find(c => c.sk === 'mahā').seen.length >= 10);
+});

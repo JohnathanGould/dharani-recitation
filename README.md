@@ -16,9 +16,12 @@ your device.
 - **Practice**: spaced repetition, one verse at a time. By default the cue is the verse before (with
   more lines when one line is not enough to tell where you are), and you **say** the verse aloud,
   reveal it, and rate yourself Missed, Shaky or Got it. You can also type answers, which are graded
-  word by word and accept plain letters and common respellings. Record yourself to hear how you sounded.
+  word by word and accept plain letters and common respellings. Record yourself to hear how you sounded. A hint shows the English meaning with the first letters.
   **Practice this verse** (on any verse) drills one verse in two steps: say it aloud and rate yourself,
   then write it from memory and have it graded. The two count as one review, scheduled by the weaker.
+- **Words**: a word learner with two decks. *Building blocks* are the 54 roots that recur (mahā = great,
+  sarva = all, īśvara = lord…); *Words in the text* are the full glossed words. Multiple-choice quizzes in
+  either direction, with their own spaced review, and every card shows the verses it appears in.
 - **Recite**: *Build the chain* recites from a start verse to the end of your chain; a clean recital adds
   the next verse. Recitals are timed, you mark the verses you stumbled on, and the app shows where you
   stumble most and lets you practise that step.
@@ -58,5 +61,6 @@ When you change any app file, bump `VERSION` in `sw.js` so installed copies pick
 | `src/store.js` | Progress, spaced repetition, backups |
 | `src/grade.js` | Matching typed answers against the text |
 | `src/pron.js` | Pronunciation respelling and long-sound marking |
+| `src/words.js` | The word learner's decks |
 | `src/recorder.js` | Recording yourself with the microphone |
 | `sw.js`, `manifest.webmanifest`, `icons/` | Offline support and installing |

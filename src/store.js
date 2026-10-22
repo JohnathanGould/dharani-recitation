@@ -8,7 +8,8 @@ const defaults = () => ({
   strict: false, newPerDay: 3, answer: 'say', prompt: 'prev', recRecital: false,
   show: {pron: true, words: true, en: true, len: true},
   days: [], lines: {}, newToday: {date: '', n: 0}, recent: {},
-  chain: {from: 1, to: 2}, recitals: [], stumbles: {}
+  chain: {from: 1, to: 2}, recitals: [], stumbles: {},
+  words: {}, wordDeck: 'blocks', wordDir: 'sk2en'
 });
 function merge(st) {
   // Accept the original study tool's layout too, where progress sat under books.doc.
@@ -32,7 +33,7 @@ export function importJSON(text) {
   S = merge(st); save();
 }
 export function resetProgress() {
-  const keep = {strict: S.strict, newPerDay: S.newPerDay, answer: S.answer, prompt: S.prompt, show: S.show, recRecital: S.recRecital};
+  const keep = {strict: S.strict, newPerDay: S.newPerDay, answer: S.answer, prompt: S.prompt, show: S.show, recRecital: S.recRecital, wordDeck: S.wordDeck, wordDir: S.wordDir};
   S = Object.assign(defaults(), keep); save();
 }
 
@@ -66,6 +67,15 @@ export function setLevel(id, lv) {
   if (lv === 'new') delete S.lines[id];
   else S.lines[id] = {box: lv === 'known' ? 3 : 1, due: Date.now() + (lv === 'known' ? INTERVALS[3] : 0), seen: true, reviews: (S.lines[id] && S.lines[id].reviews) || 0};
   save();
+}
+
+/* Word cards have their own boxes: right moves a card up, wrong sends it back to the start. */
+export const wordLevel = key => { const st = S.words[key]; if (!st || !st.seen) return 'new'; return st.box >= 3 ? 'known' : 'learning'; };
+export function applyWord(key, correct) {
+  const st = S.words[key] || (S.words[key] = {box: 0, due: 0, seen: false});
+  st.seen = true; st.box = correct ? Math.min(5, st.box + 1) : 0;
+  st.due = Date.now() + INTERVALS[st.box];
+  markDay(); save();
 }
 
 /* Latest mistakes per verse. marks is null for spoken attempts, which have no typed words to compare. */

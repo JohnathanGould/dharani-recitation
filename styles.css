@@ -192,3 +192,19 @@ h3.sec { font-size: .78rem; letter-spacing: .12em; text-transform: uppercase; co
 @keyframes pulse { to { opacity: .3; } }
 .trouble li { margin: 4px 0; }
 .offline { font-size: .8rem; color: var(--ink-2); text-align: center; margin-top: 28px; }
+
+/* word learner */
+.opts { display: grid; gap: 8px; margin-top: 14px; }
+.opt { text-align: left; padding: 12px 14px; }
+.opt[lang] { font-family: var(--serif); font-size: 1.15rem; }
+.opt:disabled { cursor: default; opacity: .75; }
+.opt.right { background: var(--good-soft); border-color: var(--good); color: var(--ink); opacity: 1; }
+.opt.wrong { background: var(--bad-soft); border-color: var(--bad); color: var(--ink); opacity: 1; }
+mark.hl { background: var(--accent-soft); color: var(--ink); border-radius: 3px; padding: 0 2px; }
+.wrow { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--rule); }
+.wrow b { font-family: var(--serif); font-size: 1.1rem; }
+.wrow .tp { font-size: .82rem; color: var(--accent); }
+.lv { flex: none; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--accent); }
+.lv[data-level="learning"] { background: var(--warn); border-color: var(--warn); }
+.lv[data-level="known"] { background: var(--good); border-color: var(--good); }
+details.card > summary { list-style-position: inside; }
