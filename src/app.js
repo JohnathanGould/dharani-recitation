@@ -4,6 +4,7 @@ import {fold, gradeSeq} from './grade.js';
 import * as store from './store.js';
 import * as rec from './recorder.js';
 import {DECKS} from './words.js';
+import {spans} from './align.js';
 
 const {DAY, INTERVALS, levelOf} = store;
 const V = DOC;
@@ -21,6 +22,40 @@ function marked(sk, marks, len) {
   return sk.split(' ').map(w => '<span class="w">' + w.split('-').map(p =>
     '<span class="p ' + (marks ? marks[k++] : '') + '">' + (len ? lengthHTML(p, esc) : esc(p)) + '</span>').join('<span class="hy">-</span>') + '</span>').join(' ');
 }
+/* Tap a Sanskrit word to light up the English it becomes, or tap the English to light up its Sanskrit.
+   The verse's container carries data-verse; .tw are Sanskrit word parts, .enw are pieces of the English. */
+function tapSk(v, len) {
+  let k = 0;
+  return v.sk.split(' ').map(w => '<span class="w">' + w.split('-').map(p => '<span class="p tw" role="button" tabindex="0" data-act="tapw" data-i="' + (k++) + '">' +
+    (len ? lengthHTML(p, esc) : esc(p)) + '</span>').join('<span class="hy">-</span>') + '</span>').join(' ');
+}
+function tapEn(v) {
+  const sp = spans(v.id, v.en), cuts = new Set([0, v.en.length]);
+  sp.forEach(rs => rs.forEach(([a, b]) => { cuts.add(a); cuts.add(b); }));
+  const pts = [...cuts].sort((a, b) => a - b);
+  let h = '';
+  for (let j = 0; j < pts.length - 1; j++) {
+    const a = pts[j], b = pts[j + 1], seg = v.en.slice(a, b);
+    const ps = sp.map((rs, i) => rs.some(([x, y]) => x <= a && b <= y) ? i : -1).filter(i => i >= 0);
+    h += ps.length ? '<span class="enw" role="button" tabindex="0" data-act="tape" data-ps="' + ps.join(' ') + '">' + esc(seg) + '</span>' : esc(seg);
+  }
+  return h;
+}
+function lightUp(box, idxs) {
+  box.querySelectorAll('.tw.on, .enw.on').forEach(e => e.classList.remove('on'));
+  const line = box.querySelector('.tapgloss');
+  if (!idxs) { delete box.dataset.sel; if (line) line.innerHTML = ''; return; }
+  box.dataset.sel = idxs.join(' ');
+  idxs.forEach(i => box.querySelectorAll('.tw[data-i="' + i + '"]').forEach(e => e.classList.add('on')));
+  box.querySelectorAll('.enw').forEach(e => { if (e.dataset.ps.split(' ').some(p => idxs.includes(+p))) e.classList.add('on'); });
+  if (!line) return;
+  const v = byId(+box.dataset.verse), parts = partsOf(v.sk), sp = spans(v.id, v.en);
+  line.innerHTML = [...new Set(idxs.map(i => parts[i]))].map(p => {
+    const i = parts.indexOf(p), g = GLOSS[keyOf(p)];
+    return '<b lang="sa-Latn">' + esc(p) + '</b>' + (g ? ' = ' + esc(g) : '') + (sp[i].length ? '' : ' <span class="muted">(not in this English translation)</span>');
+  }).join(' · ');
+}
+
 const levelLabel = {new: 'New', learning: 'Learning', known: 'Known'};
 
 /* Lines that repeat word for word, and lines that start the same way. */
@@ -116,11 +151,11 @@ function leafHTML(v, opts) {
   opts = opts || {};
   const lvl = levelOf(v.id), sh = S().show;
   const others = readings(v).slice(1).map(r => '<span lang="sa-Latn">' + hy(r.text) + '</span>');
-  return '<article class="leaf" data-level="' + lvl + '" id="line-' + v.id + '">' +
+  return '<article class="leaf" data-level="' + lvl + '" id="line-' + v.id + '" data-verse="' + v.id + '">' +
     '<div class="leaf-top"><span>Verse ' + v.id + '</span><span>' + levelLabel[lvl] + (store.meaningLevel(v.id) === 'known' ? ' · can translate' : '') + '</span></div>' +
-    '<p class="sk" lang="sa-Latn">' + marked(v.sk, null, sh.len) + '</p>' +
+    '<p class="sk" lang="sa-Latn">' + tapSk(v, sh.len) + '</p>' +
     (sh.pron ? '<p class="pron">' + esc(pronText(v.sk)) + '</p>' : '') +
-    (sh.en ? '<p class="en">' + esc(v.en) + '</p>' : '') +
+    (sh.en ? '<p class="en">' + tapEn(v) + '</p>' : '') + '<p class="tapgloss" aria-live="polite"></p>' +
     repeatNote(v) + echoNote(v) +
     (v.lc ? '<p class="note">Translation uncertain: some words here are obscure.</p>' : '') +
     (sh.words ? tilesHTML(v.sk) : '') +
@@ -137,6 +172,7 @@ function viewLearn() {
   V.forEach(v => { if (v.sec !== cur) { cur = v.sec; body += '<h3 class="sec">' + esc(SECTIONS[cur]) + '</h3>'; } body += leafHTML(v); });
   return '<details class="about"><summary>About this text</summary><p>This is the text from your printed study document, taught exactly as printed. It is the longer version of the Nīlakaṇṭha Dhāraṇī, written in IAST, the scholarly way of spelling Sanskrit with marks such as ā, ś and ṛ. Under many verses you will see where Lokesh Chandra\'s 1988 reconstruction reads differently. Those other readings are accepted when you practice. See the Sources tab.</p></details>' +
     '<div class="chips"><span class="small muted">Show:</span>' + chip('len', 'Long sounds') + chip('pron', 'Pronunciation') + chip('words', 'Word by word') + chip('en', 'English') + '</div>' +
+    '<p class="small muted" style="margin:-6px 0 8px">Tap any Sanskrit word to see the English it becomes, or tap the English to find its Sanskrit.</p>' +
     (S().show.len ? '<p class="small muted" style="margin:-6px 0 14px">Underlined: long vowels, held about twice as long. Dotted: doubled consonants, held one beat. See the Sounds tab.</p>' : '') +
     '<div class="stack">' + body + '</div>';
 }
@@ -259,12 +295,12 @@ function coverage(v, text) {
     .map(x => ({p: x.p, g: x.g, ok: contentWords(x.g).some(w => mine.some(m => m.startsWith(w.slice(0, 5)) || w.startsWith(m.slice(0, 5)) && m.length >= 5))}));
 }
 function translateHTML(v) {
-  let h = '<div class="card"><p class="prompt-label">Translate into English</p><div class="res" lang="sa-Latn">' + hy(v.sk) + '</div>';
+  let h = '<div class="card" data-verse="' + v.id + '"><p class="prompt-label">Translate into English</p><div class="res" lang="sa-Latn">' + (P.trShown ? tapSk(v) : hy(v.sk)) + '</div>';
   if (!P.trShown) return h + '<textarea class="field sans" id="tr" rows="2" aria-label="Your translation" placeholder="Type your translation, or say it to yourself">' + esc(P.trText) + '</textarea>' +
     '<div class="row" style="margin-top:10px"><button class="btn primary" data-act="tr-show">Show the meaning</button><button class="btn quiet" data-act="tr-skip">Skip</button></div></div>';
   const cov = P.trText.trim() ? coverage(v, P.trText) : [];
   return h + (P.trText.trim() ? '<p class="typed">You wrote: ' + esc(P.trText) + '</p>' : '') +
-    '<p class="prompt-label" style="margin-top:12px">Translation</p><p class="en" style="font-size:1.1rem;margin-top:0">' + esc(v.en) + '</p>' +
+    '<p class="prompt-label" style="margin-top:12px">Translation</p><p class="en" style="font-size:1.1rem;margin-top:0">' + tapEn(v) + '</p><p class="tapgloss" aria-live="polite"><span class="muted">Tap a word, Sanskrit or English, to see which words match.</span></p>' +
     (v.lc ? '<p class="note">Translation uncertain: some words here are obscure.</p>' : '') +
     (cov.length ? '<p class="prompt-label" style="margin-top:12px">Key words (rough check)</p><div class="chips">' + cov.map(c => '<span class="chip cov' + (c.ok ? ' ok' : '') + '" style="cursor:default"><span lang="sa-Latn">' + esc(c.p) + '</span> · ' + esc(c.g) + '</span>').join('') + '</div>' : '') +
     tilesHTML(v.sk) +
@@ -577,6 +613,11 @@ document.addEventListener('click', async e => {
   if (act !== 'clear-mistakes') P.confirmClear = false;
   const keepTyped = () => { const a = $('#ans'); if (a) P.typed = a.value; const r = $('#recital'); if (r) R.text = r.value; };
   switch (act) {
+    case 'tapw': case 'tape': {
+      const box = t.closest('[data-verse]'); if (!box) break;
+      const idxs = act === 'tapw' ? [+t.dataset.i] : t.dataset.ps.split(' ').map(Number);
+      lightUp(box, box.dataset.sel === idxs.join(' ') ? null : idxs); break;
+    }
     case 'toggle-show': S().show[t.dataset.k] = !S().show[t.dataset.k]; store.save(); { const y = scrollY; render(); scrollTo(0, y); } break;
     case 'toggle-strict': S().strict = !S().strict; store.save(); render(); break;
     case 'answer': keepTyped(); S().answer = t.dataset.v; store.save(); if (R.phase !== 'running') R.phase = 'ready'; render(); break;
@@ -690,6 +731,7 @@ document.addEventListener('change', async e => {
 document.addEventListener('focusin', e => { if (e.target.classList && e.target.classList.contains('fx')) lastFx = e.target; });
 document.addEventListener('mousedown', e => { if (e.target.closest('.key')) e.preventDefault(); });
 document.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && (e.target.classList.contains('tw') || e.target.classList.contains('enw'))) { e.preventDefault(); e.target.click(); return; }
   if (e.target.id === 'ans' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doCheck(false); }
   if (e.target.classList && e.target.classList.contains('fx') && e.key === 'Enter') { e.preventDefault(); fxCheck(e.target.id); }
 });

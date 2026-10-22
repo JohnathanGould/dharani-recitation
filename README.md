@@ -13,6 +13,7 @@ your device.
   underlined and doubled consonants dotted, because holding them is most of what makes spoken Sanskrit
   sound right. Lines that repeat (verses 3 and 69, 19 and 48) or start the same way (22 and 27, 38 and
   39) carry a warning, and the svāhā offerings link back to the epithets they echo in the mantra.
+  Tap any Sanskrit word to highlight the English it becomes, or tap the English to find its Sanskrit.
 - **Practice**: spaced repetition, one verse at a time. By default the cue is the verse before (with
   more lines when one line is not enough to tell where you are), and you **say** the verse aloud,
   reveal it, and rate yourself Missed, Shaky or Got it. You can also type answers, which are graded
@@ -64,6 +65,7 @@ When you change any app file, bump `VERSION` in `sw.js` so installed copies pick
 | `src/store.js` | Progress, spaced repetition, backups |
 | `src/grade.js` | Matching typed answers against the text |
 | `src/pron.js` | Pronunciation respelling and long-sound marking |
+| `src/align.js` | Which words of each verse's English translate each Sanskrit word |
 | `src/words.js` | The word learner's decks |
 | `src/recorder.js` | Recording yourself with the microphone |
 | `sw.js`, `manifest.webmanifest`, `icons/` | Offline support and installing |

@@ -52,3 +52,19 @@ test('every word card is found somewhere in the text', async () => {
   for (const d of Object.values(DECKS)) for (const c of d.cards) assert.ok(c.seen.length > 0, c.sk + ' is not found in any verse');
   assert.ok(DECKS.blocks.cards.find(c => c.sk === 'mahā').seen.length >= 10);
 });
+
+test('every Sanskrit word is aligned to phrases that exist in its English', async () => {
+  const {ALIGN, spans} = await import('../src/align.js');
+  for (const v of DOC) {
+    const a = ALIGN[v.id];
+    assert.ok(a, 'verse ' + v.id + ' has no alignment');
+    assert.equal(a.length, parts(v.sk).length, 'verse ' + v.id + ': one entry per word part');
+    const s = spans(v.id, v.en);
+    a.forEach((e, i) => {
+      const want = e == null ? 0 : Array.isArray(e) ? e.length : 1;
+      assert.equal(s[i].length, want, 'verse ' + v.id + ', ' + parts(v.sk)[i] + ': phrase not found in "' + v.en + '"');
+    });
+  }
+  const v7 = DOC[6], s7 = spans(7, v7.en);
+  assert.equal(v7.en.slice(...s7[0][0]), 'all');
+});
