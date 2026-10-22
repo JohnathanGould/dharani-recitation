@@ -9,7 +9,8 @@ const defaults = () => ({
   show: {pron: true, words: true, en: true, len: true},
   days: [], lines: {}, newToday: {date: '', n: 0}, recent: {},
   chain: {from: 1, to: 2}, recitals: [], stumbles: {},
-  words: {}, wordDeck: 'blocks', wordDir: 'sk2en'
+  words: {}, wordDeck: 'blocks', wordDir: 'sk2en',
+  translate: true, meaning: {}
 });
 function merge(st) {
   // Accept the original study tool's layout too, where progress sat under books.doc.
@@ -33,7 +34,7 @@ export function importJSON(text) {
   S = merge(st); save();
 }
 export function resetProgress() {
-  const keep = {strict: S.strict, newPerDay: S.newPerDay, answer: S.answer, prompt: S.prompt, show: S.show, recRecital: S.recRecital, wordDeck: S.wordDeck, wordDir: S.wordDir};
+  const keep = {strict: S.strict, newPerDay: S.newPerDay, answer: S.answer, prompt: S.prompt, show: S.show, recRecital: S.recRecital, wordDeck: S.wordDeck, wordDir: S.wordDir, translate: S.translate};
   S = Object.assign(defaults(), keep); save();
 }
 
@@ -75,6 +76,14 @@ export function applyWord(key, correct) {
   const st = S.words[key] || (S.words[key] = {box: 0, due: 0, seen: false});
   st.seen = true; st.box = correct ? Math.min(5, st.box + 1) : 0;
   st.due = Date.now() + INTERVALS[st.box];
+  markDay(); save();
+}
+
+/* How well you can translate each verse, from your own ratings. */
+export const meaningLevel = id => { const st = S.meaning[id]; if (!st) return 'new'; return st.box >= 2 ? 'known' : 'learning'; };
+export function applyMeaning(id, outcome) {
+  const st = S.meaning[id] || (S.meaning[id] = {box: 0, n: 0});
+  st.n++; st.box = outcome === 'perfect' ? Math.min(5, st.box + 1) : outcome === 'miss' ? 0 : st.box;
   markDay(); save();
 }
 

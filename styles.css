@@ -208,3 +208,9 @@ mark.hl { background: var(--accent-soft); color: var(--ink); border-radius: 3px;
 .lv[data-level="learning"] { background: var(--warn); border-color: var(--warn); }
 .lv[data-level="known"] { background: var(--good); border-color: var(--good); }
 details.card > summary { list-style-position: inside; }
+
+/* translation check */
+.field.sans { font-family: var(--sans); font-size: 1.05rem; }
+.chip.cov { font-weight: 500; }
+.chip.cov.ok { background: var(--good-soft); border-color: var(--good); color: var(--ink); }
+.chip.cov.ok::before { content: "✓ "; color: var(--good); font-weight: 700; }

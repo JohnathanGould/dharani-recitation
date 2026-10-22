@@ -78,7 +78,7 @@ const seg = (act, cur, opts, label) => '<div class="seg" role="group" aria-label
 
 /* ---------- Session state ---------- */
 let tab = 'learn';
-const P = {active: false, queue: [], idx: 0, stage: 'recall', hint: 0, results: [], typed: '', outcome: null, wait: 0, flash: '', drillSaid: null, confirmReset: false, confirmClear: false};
+const P = {active: false, queue: [], idx: 0, stage: 'recall', hint: 0, results: [], typed: '', outcome: null, wait: 0, flash: '', drillSaid: null, trShown: false, trText: '', meanings: [], confirmReset: false, confirmClear: false};
 const R = {mode: 'chain', from: 1, to: 8, hints: false, phase: 'ready', t0: 0, ms: 0, text: '', result: null, stumbled: new Set(), saved: false};
 let timerId = null, lastFx = null;
 
@@ -117,7 +117,7 @@ function leafHTML(v, opts) {
   const lvl = levelOf(v.id), sh = S().show;
   const others = readings(v).slice(1).map(r => '<span lang="sa-Latn">' + hy(r.text) + '</span>');
   return '<article class="leaf" data-level="' + lvl + '" id="line-' + v.id + '">' +
-    '<div class="leaf-top"><span>Verse ' + v.id + '</span><span>' + levelLabel[lvl] + '</span></div>' +
+    '<div class="leaf-top"><span>Verse ' + v.id + '</span><span>' + levelLabel[lvl] + (store.meaningLevel(v.id) === 'known' ? ' · can translate' : '') + '</span></div>' +
     '<p class="sk" lang="sa-Latn">' + marked(v.sk, null, sh.len) + '</p>' +
     (sh.pron ? '<p class="pron">' + esc(pronText(v.sk)) + '</p>' : '') +
     (sh.en ? '<p class="en">' + esc(v.en) + '</p>' : '') +
@@ -152,7 +152,7 @@ function newIds() {
 }
 function startSession(ids, all) {
   const queue = ids.map(id => ({id, isNew: !(S().lines[id] && S().lines[id].seen) && !all, retry: false}));
-  Object.assign(P, {active: true, queue, idx: 0, results: [], flash: '', drillSaid: null});
+  Object.assign(P, {active: true, queue, idx: 0, results: [], flash: '', drillSaid: null, meanings: []});
   setStageForCurrent();
   go('practice');
 }
@@ -160,11 +160,11 @@ function startSession(ids, all) {
    The two count as one review, scheduled by the weaker of the two. */
 function startDrill(id) {
   const queue = [{id, mode: 'say', drill: true, retry: false}, {id, mode: 'write', drill: true, retry: false}];
-  Object.assign(P, {active: true, queue, idx: 0, results: [], flash: '', drillSaid: null});
+  Object.assign(P, {active: true, queue, idx: 0, results: [], flash: '', drillSaid: null, meanings: []});
   setStageForCurrent();
   go('practice');
 }
-function setStageForCurrent() { const it = P.queue[P.idx]; P.stage = it && it.isNew ? 'study' : 'recall'; P.hint = 0; P.typed = ''; P.outcome = null; }
+function setStageForCurrent() { const it = P.queue[P.idx]; P.stage = it && it.isNew ? 'study' : 'recall'; P.hint = 0; P.typed = ''; P.outcome = null; P.trShown = false; P.trText = ''; }
 
 function promptHTML(v) {
   if (S().prompt === 'meaning') return '<p class="prompt-label">Meaning</p><p class="prompt-body">' + esc(v.en) + '</p>';
@@ -186,7 +186,7 @@ function viewPracticeHome() {
     '<p class="small muted" style="margin:0 0 6px">Answer by</p>' + seg('answer', S().answer, [['say', 'Saying it aloud'], ['type', 'Typing it']], 'Answer by') +
     '<p class="small muted" style="margin:12px 0 6px">Cue</p>' + seg('prompt', S().prompt, [['prev', 'The verse before'], ['meaning', 'The meaning']], 'Cue') +
     '<p class="muted small" style="margin:10px 0 0;max-width:62ch">Saying it aloud is closest to reciting: you recall the verse, say it, reveal it, and rate yourself. The verse before is the natural cue for a recitation, since each line leads into the next.</p>' +
-    '<div class="chips" style="margin:14px 0 6px"><button class="chip" data-act="toggle-strict" aria-pressed="' + S().strict + '">Require diacritics when typing (ā, ś, ṛ…)</button></div>' +
+    '<div class="chips" style="margin:14px 0 6px"><button class="chip" data-act="toggle-translate" aria-pressed="' + S().translate + '">Translate each verse into English</button><button class="chip" data-act="toggle-strict" aria-pressed="' + S().strict + '">Require diacritics when typing (ā, ś, ṛ…)</button></div>' +
     '<div class="row"><span class="small muted">New verses per day</span><select class="sel" id="npd" aria-label="New per day">' + [2, 3, 5, 8].map(n => '<option' + (n === S().newPerDay ? ' selected' : '') + '>' + n + '</option>').join('') + '</select></div></div>' +
     '<div class="card"><h2>Your progress</h2><p class="muted small" style="margin:0 0 12px;max-width:62ch">Progress is saved in this browser on this device. Download a backup now and then, and load it to move your progress to another device.</p>' +
     '<div class="row"><button class="btn" data-act="export">Download backup</button><label class="btn" style="display:inline-block">Load backup<input type="file" id="importFile" accept="application/json,.json" hidden></label>' +
@@ -197,7 +197,9 @@ function viewPractice() {
   if (P.idx >= P.queue.length) {
     const c = {perfect: 0, close: 0, miss: 0};
     P.results.forEach(r => c[r.outcome]++);
-    return '<div class="card"><h2>Session complete</h2><div class="stats" style="margin:10px 0"><div class="stat"><b>' + c.perfect + '</b><span>Got it</span></div><div class="stat"><b>' + c.close + '</b><span>Shaky</span></div><div class="stat"><b>' + c.miss + '</b><span>Missed</span></div></div><div class="row"><button class="btn primary" data-act="finish">Done</button><button class="btn" data-act="go-recite">Try a full recital</button></div></div>';
+    return '<div class="card"><h2>Session complete</h2><div class="stats" style="margin:10px 0"><div class="stat"><b>' + c.perfect + '</b><span>Got it</span></div><div class="stat"><b>' + c.close + '</b><span>Shaky</span></div><div class="stat"><b>' + c.miss + '</b><span>Missed</span></div></div>' +
+      (P.meanings.length ? '<p class="small muted" style="margin:0 0 12px">Translations: ' + ['perfect', 'close', 'miss'].map(o => P.meanings.filter(m => m === o).length + ' ' + {perfect: 'got it', close: 'partly', miss: 'not yet'}[o]).join(' · ') + '</p>' : '') +
+      '<div class="row"><button class="btn primary" data-act="finish">Done</button><button class="btn" data-act="go-recite">Try a full recital</button></div></div>';
   }
   const it = P.queue[P.idx], v = byId(it.id), say = it.mode ? it.mode === 'say' : S().answer === 'say';
   const step = it.drill && !it.retry ? ' · step ' + (it.mode === 'say' ? '1 of 2: say it' : '2 of 2: write it') : '';
@@ -223,12 +225,13 @@ function viewPractice() {
   }
   if (P.stage === 'reveal') {
     return bar + head + '<div class="card"><p class="prompt-label">The verse</p><div class="res" lang="sa-Latn">' + marked(v.sk, null, true) + '</div>' +
-      '<p class="pron">' + esc(pronText(v.sk)) + '</p><p class="en">' + esc(v.en) + '</p>' + repeatNote(v) +
+      '<p class="pron">' + esc(pronText(v.sk)) + '</p>' + (willTranslate(it) ? '' : '<p class="en">' + esc(v.en) + '</p>') + repeatNote(v) +
       (readings(v).length > 1 ? '<p class="alt">Also accepted: ' + readings(v).slice(1).map(r => '<span lang="sa-Latn">' + hy(r.text) + '</span>').join(' · ') + '</p>' : '') +
       recBar('p-' + v.id) +
       '<p class="prompt-label" style="margin-top:14px">How did it go?</p><div class="rate"><button class="btn miss" data-act="rate" data-o="miss">Missed</button><button class="btn close" data-act="rate" data-o="close">Shaky</button><button class="btn perfect" data-act="rate" data-o="perfect">Got it</button></div>' +
       '<p class="small muted" style="margin:8px 0 0">Got it: every word, in order, with long sounds held. Shaky: you got there, with pauses or a slip.</p></div>';
   }
+  if (P.stage === 'translate') return bar + head + translateHTML(v);
   const g = P.outcome, shown = g.text;
   const label = {perfect: 'Perfect', close: 'Close', miss: 'Not yet'}[g.outcome];
   return bar + head + '<div class="card"><span class="verdict ' + g.outcome + '">' + label + '</span>' +
@@ -237,11 +240,38 @@ function viewPractice() {
     (g.gaveUp || !P.typed.trim() ? '' : '<p class="typed">You typed: ' + esc(P.typed) + '</p>') +
     (g.extra ? '<p class="small muted" style="margin:0 0 6px">Every word matched, but you typed extra letters or words around the verse.</p>' : '') +
     (!g.gaveUp && g.label === 'variant' && g.outcome !== 'miss' ? '<p class="small muted" style="margin:0 0 6px">This matched another accepted reading.</p>' : '') +
-    '<p class="pron">' + esc(pronText(shown)) + '</p><p class="en">' + esc(v.en) + '</p>' + repeatNote(v) +
+    '<p class="pron">' + esc(pronText(shown)) + '</p>' + (willTranslate(it) ? '' : '<p class="en">' + esc(v.en) + '</p>') + repeatNote(v) +
     (g.said ? '<p class="small muted" style="margin:10px 0 0">Said aloud: ' + {perfect: 'got it', close: 'shaky', miss: 'missed'}[g.said] + ' · Written: ' + {perfect: 'perfect', close: 'close', miss: 'not yet'}[g.outcome] + '. Scheduled by the weaker of the two.</p>' : '') +
     '<p class="small muted" style="margin:10px 0 12px">Next review in ' + fmtWait(P.wait) + (g.outcome === 'miss' ? '. It will come back at the end of this session.' : '.') + '</p>' +
-    '<div class="row"><button class="btn primary" id="next" data-act="next">' + (P.idx + 1 >= P.queue.length ? 'Finish' : P.queue[P.idx + 1].drill ? 'Try writing it again' : 'Next verse') + '</button></div></div>';
+    '<div class="row"><button class="btn primary" id="next" data-act="next">' + (willTranslate(it) ? 'Translate it' : P.idx + 1 >= P.queue.length ? 'Finish' : P.queue[P.idx + 1].drill ? 'Try writing it again' : 'Next verse') + '</button></div></div>';
 }
+/* Translation check: after recalling a verse, say what it means, then compare with the English.
+   Skipped when the cue was the meaning itself, and on second tries. */
+const willTranslate = it => S().translate && S().prompt !== 'meaning' && !it.retry;
+const STOP = new Set(['with', 'from', 'that', 'this', 'which', 'whose', 'into', 'upon', 'have', 'also', 'more', 'than']);
+const contentWords = s => s.toLowerCase().replace(/\(.*?\)/g, ' ').split(/[^a-z]+/).filter(w => w.length >= 4 && !STOP.has(w));
+/* A rough check of which glossed words a typed translation touches on: a gloss word counts if a word
+   you typed starts with its first five letters (so "compassion" covers "compassionate"). */
+function coverage(v, text) {
+  const mine = contentWords(text);
+  const seen = new Set();
+  return partsOf(v.sk).map(p => ({p, g: GLOSS[keyOf(p)]})).filter(x => x.g && contentWords(x.g).length && !seen.has(x.p) && seen.add(x.p))
+    .map(x => ({p: x.p, g: x.g, ok: contentWords(x.g).some(w => mine.some(m => m.startsWith(w.slice(0, 5)) || w.startsWith(m.slice(0, 5)) && m.length >= 5))}));
+}
+function translateHTML(v) {
+  let h = '<div class="card"><p class="prompt-label">Translate into English</p><div class="res" lang="sa-Latn">' + hy(v.sk) + '</div>';
+  if (!P.trShown) return h + '<textarea class="field sans" id="tr" rows="2" aria-label="Your translation" placeholder="Type your translation, or say it to yourself">' + esc(P.trText) + '</textarea>' +
+    '<div class="row" style="margin-top:10px"><button class="btn primary" data-act="tr-show">Show the meaning</button><button class="btn quiet" data-act="tr-skip">Skip</button></div></div>';
+  const cov = P.trText.trim() ? coverage(v, P.trText) : [];
+  return h + (P.trText.trim() ? '<p class="typed">You wrote: ' + esc(P.trText) + '</p>' : '') +
+    '<p class="prompt-label" style="margin-top:12px">Translation</p><p class="en" style="font-size:1.1rem;margin-top:0">' + esc(v.en) + '</p>' +
+    (v.lc ? '<p class="note">Translation uncertain: some words here are obscure.</p>' : '') +
+    (cov.length ? '<p class="prompt-label" style="margin-top:12px">Key words (rough check)</p><div class="chips">' + cov.map(c => '<span class="chip cov' + (c.ok ? ' ok' : '') + '" style="cursor:default"><span lang="sa-Latn">' + esc(c.p) + '</span> · ' + esc(c.g) + '</span>').join('') + '</div>' : '') +
+    tilesHTML(v.sk) +
+    '<p class="prompt-label" style="margin-top:14px">Did you have the meaning?</p><div class="rate"><button class="btn miss" data-act="tr-rate" data-o="miss">Not yet</button><button class="btn close" data-act="tr-rate" data-o="close">Partly</button><button class="btn perfect" data-act="tr-rate" data-o="perfect">Got it</button></div></div>';
+}
+function advance() { P.idx++; if (P.idx < P.queue.length) setStageForCurrent(); render(); scrollTo(0, 0); }
+
 function finishItem(v, outcome) {
   P.results.push({id: v.id, outcome});
   const it = P.queue[P.idx];
@@ -285,8 +315,8 @@ async function rate(outcome) {
   const wait = store.applyOutcome(v.id, outcome, P.hint > 0 ? 1 : 0);
   finishItem(v, outcome);
   P.flash = 'Verse ' + v.id + ': ' + {perfect: 'got it', close: 'shaky', miss: 'missed'}[outcome] + '. Next review in ' + fmtWait(wait) + (outcome === 'miss' ? ', and again at the end of this session.' : '.');
-  P.idx++; if (P.idx < P.queue.length) setStageForCurrent();
-  render(); window.scrollTo(0, 0);
+  if (willTranslate(it)) { P.stage = 'translate'; render(); scrollTo(0, 0); return; }
+  advance();
 }
 
 /* ---------- Words ---------- */
@@ -574,7 +604,11 @@ document.addEventListener('click', async e => {
     case 'rate': await rate(t.dataset.o); break;
     case 'check': doCheck(false); break;
     case 'giveup': doCheck(true); break;
-    case 'next': P.idx++; if (P.idx < P.queue.length) setStageForCurrent(); render(); scrollTo(0, 0); break;
+    case 'next': if (P.stage === 'result' && willTranslate(P.queue[P.idx])) { P.flash = ''; P.stage = 'translate'; render(); scrollTo(0, 0); } else advance(); break;
+    case 'tr-show': { const a = $('#tr'); P.trText = a ? a.value : ''; P.trShown = true; render(); break; }
+    case 'tr-skip': P.flash = ''; advance(); break;
+    case 'tr-rate': store.applyMeaning(P.queue[P.idx].id, t.dataset.o); P.meanings.push(t.dataset.o); P.flash = ''; advance(); break;
+    case 'toggle-translate': S().translate = !S().translate; store.save(); render(); break;
     case 'finish': if (rec.recording()) await rec.stop(); P.active = false; P.flash = ''; render(); scrollTo(0, 0); break;
     case 'go-recite': P.active = false; P.flash = ''; go('recite'); break;
     case 'reset':

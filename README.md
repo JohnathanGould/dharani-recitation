@@ -17,6 +17,9 @@ your device.
   more lines when one line is not enough to tell where you are), and you **say** the verse aloud,
   reveal it, and rate yourself Missed, Shaky or Got it. You can also type answers, which are graded
   word by word and accept plain letters and common respellings. Record yourself to hear how you sounded. A hint shows the English meaning with the first letters.
+  After each verse, a **translation check** asks what it means: translate it (typed or in your head),
+  then compare with the English and the word-by-word meanings and rate yourself. Typed translations get a
+  rough check of which key words they cover. It can be turned off, and is skipped when the cue was the meaning.
   **Practice this verse** (on any verse) drills one verse in two steps: say it aloud and rate yourself,
   then write it from memory and have it graded. The two count as one review, scheduled by the weaker.
 - **Words**: a word learner with two decks. *Building blocks* are the 54 roots that recur (mahā = great,
