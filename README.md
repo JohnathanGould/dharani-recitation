@@ -17,6 +17,8 @@ your device.
   more lines when one line is not enough to tell where you are), and you **say** the verse aloud,
   reveal it, and rate yourself Missed, Shaky or Got it. You can also type answers, which are graded
   word by word and accept plain letters and common respellings. Record yourself to hear how you sounded.
+  **Practice this verse** (on any verse) drills one verse in two steps: say it aloud and rate yourself,
+  then write it from memory and have it graded. The two count as one review, scheduled by the weaker.
 - **Recite**: *Build the chain* recites from a start verse to the end of your chain; a clean recital adds
   the next verse. Recitals are timed, you mark the verses you stumbled on, and the app shows where you
   stumble most and lets you practise that step.

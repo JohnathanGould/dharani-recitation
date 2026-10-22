@@ -77,7 +77,7 @@ const seg = (act, cur, opts, label) => '<div class="seg" role="group" aria-label
 
 /* ---------- Session state ---------- */
 let tab = 'learn';
-const P = {active: false, queue: [], idx: 0, stage: 'recall', hint: 0, results: [], typed: '', outcome: null, wait: 0, flash: '', confirmReset: false, confirmClear: false};
+const P = {active: false, queue: [], idx: 0, stage: 'recall', hint: 0, results: [], typed: '', outcome: null, wait: 0, flash: '', drillSaid: null, confirmReset: false, confirmClear: false};
 const R = {mode: 'chain', from: 1, to: 8, hints: false, phase: 'ready', t0: 0, ms: 0, text: '', result: null, stumbled: new Set(), saved: false};
 let timerId = null, lastFx = null;
 
@@ -151,7 +151,15 @@ function newIds() {
 }
 function startSession(ids, all) {
   const queue = ids.map(id => ({id, isNew: !(S().lines[id] && S().lines[id].seen) && !all, retry: false}));
-  Object.assign(P, {active: true, queue, idx: 0, results: [], flash: ''});
+  Object.assign(P, {active: true, queue, idx: 0, results: [], flash: '', drillSaid: null});
+  setStageForCurrent();
+  go('practice');
+}
+/* Practice this verse: say it aloud and rate yourself, then write it from memory.
+   The two count as one review, scheduled by the weaker of the two. */
+function startDrill(id) {
+  const queue = [{id, mode: 'say', drill: true, retry: false}, {id, mode: 'write', drill: true, retry: false}];
+  Object.assign(P, {active: true, queue, idx: 0, results: [], flash: '', drillSaid: null});
   setStageForCurrent();
   go('practice');
 }
@@ -190,10 +198,11 @@ function viewPractice() {
     P.results.forEach(r => c[r.outcome]++);
     return '<div class="card"><h2>Session complete</h2><div class="stats" style="margin:10px 0"><div class="stat"><b>' + c.perfect + '</b><span>Got it</span></div><div class="stat"><b>' + c.close + '</b><span>Shaky</span></div><div class="stat"><b>' + c.miss + '</b><span>Missed</span></div></div><div class="row"><button class="btn primary" data-act="finish">Done</button><button class="btn" data-act="go-recite">Try a full recital</button></div></div>';
   }
-  const it = P.queue[P.idx], v = byId(it.id), say = S().answer === 'say';
+  const it = P.queue[P.idx], v = byId(it.id), say = it.mode ? it.mode === 'say' : S().answer === 'say';
+  const step = it.drill && !it.retry ? ' · step ' + (it.mode === 'say' ? '1 of 2: say it' : '2 of 2: write it') : '';
   const bar = '<div class="bar" aria-hidden="true"><i style="width:' + Math.round(P.idx / P.queue.length * 100) + '%"></i></div>';
-  const head = (P.flash ? '<p class="flash">' + esc(P.flash) + '</p>' : '') + '<div class="row" style="justify-content:space-between;margin:0 0 8px"><span class="small muted">Verse ' + v.id + ' · ' + (P.idx + 1) + ' of ' + P.queue.length + (it.retry ? ' · second try' : '') + '</span><button class="btn quiet small" data-act="finish">End session</button></div>';
-  const switches = '<div class="row" style="margin-top:4px">' + seg('answer', S().answer, [['say', 'Say it'], ['type', 'Type it']], 'Answer by') + seg('prompt', S().prompt, [['prev', 'Verse before'], ['meaning', 'Meaning']], 'Cue') + '</div>';
+  const head = (P.flash ? '<p class="flash">' + esc(P.flash) + '</p>' : '') + '<div class="row" style="justify-content:space-between;margin:0 0 8px"><span class="small muted">Verse ' + v.id + (it.drill ? step : ' · ' + (P.idx + 1) + ' of ' + P.queue.length) + (it.retry ? ' · second try' : '') + '</span><button class="btn quiet small" data-act="finish">End session</button></div>';
+  const switches = '<div class="row" style="margin-top:4px">' + (it.drill ? '' : seg('answer', S().answer, [['say', 'Say it'], ['type', 'Type it']], 'Answer by')) + seg('prompt', S().prompt, [['prev', 'Verse before'], ['meaning', 'Meaning']], 'Cue') + '</div>';
   if (P.stage === 'study') {
     return bar + head + '<div class="stack">' + leafHTML(v, {noActions: true}) + '</div>' + recBar('p-' + v.id, 'Record yourself reading it') +
       '<div class="row"><button class="btn primary" data-act="cover">Cover it and recall</button></div>';
@@ -205,7 +214,7 @@ function viewPractice() {
     if (say) return bar + head + '<div class="card">' + promptHTML(v) +
       '<div class="say">Say the ' + what + ' aloud, then reveal it.</div>' + recBar('p-' + v.id) + hint +
       '<div class="row"><button class="btn primary" data-act="reveal">Reveal</button>' + hintBtn + '</div></div>' + switches;
-    return bar + head + '<div class="card">' + promptHTML(v) + '<p class="prompt-label">Type the ' + what + '</p>' +
+    return bar + head + '<div class="card">' + promptHTML(v) + '<p class="prompt-label">' + (it.drill ? 'Write the ' : 'Type the ') + what + (it.drill ? ' from memory' : '') + '</p>' +
       '<textarea class="field" id="ans" rows="2" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Your answer">' + esc(P.typed) + '</textarea>' +
       keypad('ans') + hint +
       '<div class="row"><button class="btn primary" data-act="check">Check</button>' + hintBtn + '<button class="btn quiet" data-act="giveup">Show answer</button></div></div>' + switches;
@@ -227,14 +236,17 @@ function viewPractice() {
     (g.extra ? '<p class="small muted" style="margin:0 0 6px">Every word matched, but you typed extra letters or words around the verse.</p>' : '') +
     (!g.gaveUp && g.label === 'variant' && g.outcome !== 'miss' ? '<p class="small muted" style="margin:0 0 6px">This matched another accepted reading.</p>' : '') +
     '<p class="pron">' + esc(pronText(shown)) + '</p><p class="en">' + esc(v.en) + '</p>' + repeatNote(v) +
+    (g.said ? '<p class="small muted" style="margin:10px 0 0">Said aloud: ' + {perfect: 'got it', close: 'shaky', miss: 'missed'}[g.said] + ' · Written: ' + {perfect: 'perfect', close: 'close', miss: 'not yet'}[g.outcome] + '. Scheduled by the weaker of the two.</p>' : '') +
     '<p class="small muted" style="margin:10px 0 12px">Next review in ' + fmtWait(P.wait) + (g.outcome === 'miss' ? '. It will come back at the end of this session.' : '.') + '</p>' +
-    '<div class="row"><button class="btn primary" id="next" data-act="next">' + (P.idx + 1 >= P.queue.length ? 'Finish' : 'Next verse') + '</button></div></div>';
+    '<div class="row"><button class="btn primary" id="next" data-act="next">' + (P.idx + 1 >= P.queue.length ? 'Finish' : P.queue[P.idx + 1].drill ? 'Try writing it again' : 'Next verse') + '</button></div></div>';
 }
 function finishItem(v, outcome) {
   P.results.push({id: v.id, outcome});
   const it = P.queue[P.idx];
-  if (outcome === 'miss' && !it.retry) P.queue.push({id: v.id, isNew: false, retry: true});
+  if (outcome === 'miss' && !it.retry) P.queue.push({id: v.id, isNew: false, retry: true, mode: it.mode, drill: it.drill});
 }
+const RANK = {miss: 0, close: 1, perfect: 2};
+const weaker = (a, b) => RANK[a] <= RANK[b] ? a : b;
 function doCheck(gaveUp) {
   const v = byId(P.queue[P.idx].id);
   const a = $('#ans'), val = a ? a.value : '';
@@ -247,17 +259,26 @@ function doCheck(gaveUp) {
     pick = g.picks[0];
     outcome = g.exact ? 'perfect' : g.sim >= .9 ? 'close' : 'miss';
   }
+  const said = P.drillSaid; P.drillSaid = null;
   P.typed = val;
-  P.outcome = {marks: pick.marks, outcome, gaveUp: !!gaveUp, text: rds[pick.ci].text, label: rds[pick.ci].label,
+  P.outcome = {marks: pick.marks, outcome, gaveUp: !!gaveUp, text: rds[pick.ci].text, label: rds[pick.ci].label, said,
     extra: !gaveUp && !g.exact && pick.marks.every(m => m === 'ok')};
-  store.recordAttempt(v.id, pick.marks, rds[pick.ci].text, gaveUp ? '' : val, outcome === 'perfect', gaveUp ? 'gave up' : 'typed practice');
-  P.wait = store.applyOutcome(v.id, outcome, P.hint > 0 ? 1 : 0);
+  store.recordAttempt(v.id, pick.marks, rds[pick.ci].text, gaveUp ? '' : val, outcome === 'perfect', gaveUp ? 'gave up' : P.queue[P.idx].drill ? 'written practice' : 'typed practice');
+  P.wait = store.applyOutcome(v.id, said ? weaker(said, outcome) : outcome, P.hint > 0 ? 1 : 0);
   finishItem(v, outcome);
   P.flash = ''; P.stage = 'result'; render();
 }
 async function rate(outcome) {
-  const v = byId(P.queue[P.idx].id);
+  const it = P.queue[P.idx], v = byId(it.id);
   if (rec.recording()) await rec.stop();
+  if (it.drill) {
+    // The spoken half of a drill is scheduled together with the written half that follows.
+    P.drillSaid = outcome;
+    P.flash = 'Said aloud: ' + {perfect: 'got it', close: 'shaky', miss: 'missed'}[outcome] + '. Now write it from memory.';
+    P.idx++; setStageForCurrent();
+    render(); window.scrollTo(0, 0);
+    return;
+  }
   store.recordAttempt(v.id, null, v.sk, '', outcome === 'perfect', outcome === 'miss' ? 'said: missed' : 'said: shaky');
   const wait = store.applyOutcome(v.id, outcome, P.hint > 0 ? 1 : 0);
   finishItem(v, outcome);
@@ -466,7 +487,7 @@ document.addEventListener('click', async e => {
     case 'toggle-strict': S().strict = !S().strict; store.save(); render(); break;
     case 'answer': keepTyped(); S().answer = t.dataset.v; store.save(); if (R.phase !== 'running') R.phase = 'ready'; render(); break;
     case 'prompt': keepTyped(); S().prompt = t.dataset.v; store.save(); render(); break;
-    case 'practice-line': startSession([+t.dataset.id], true); break;
+    case 'practice-line': startDrill(+t.dataset.id); break;
     case 'practice-pair': { const id = +t.dataset.id; startSession(id > 1 ? [id - 1, id] : [id], true); break; }
     case 'set-level': { const y = scrollY; store.setLevel(+t.dataset.id, t.dataset.lv); render(); scrollTo(0, y); break; }
     case 'clear-mistakes':

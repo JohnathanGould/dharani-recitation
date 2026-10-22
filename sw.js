@@ -1,6 +1,6 @@
 /* Offline support: the app files are cached on install and served cache-first, refreshed in the background.
    Bump VERSION when shipping changes so old caches are cleared. */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const APP = ['./', 'index.html', 'styles.css', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png',
   'src/app.js', 'src/data.js', 'src/grade.js', 'src/pron.js', 'src/store.js', 'src/recorder.js'];
 
