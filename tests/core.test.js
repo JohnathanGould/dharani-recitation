@@ -69,3 +69,13 @@ test('every Sanskrit word is aligned to phrases that exist in its English', asyn
   const v7 = DOC[6], s7 = spans(7, v7.en);
   assert.equal(v7.en.slice(...s7[0][0]), 'all');
 });
+
+test('IAST is converted to Devanagari for the speech voice', async () => {
+  const {toDeva} = await import('../src/translit.js');
+  assert.equal(toDeva('namo ratna-trayāya'), 'नमो रत्नत्रयाय');
+  assert.equal(toDeva('sarva mṛtyu upadrava vināśana-karāya'), 'सर्व मृत्यु उपद्रव विनाशनकराय');
+  assert.equal(toDeva('prahlādaya manaḥ svāhā'), 'प्रह्लादय मनः स्वाहा');
+  assert.equal(toDeva('mahāṭṭahāsaṃ'), 'महाट्टहासं');
+  assert.equal(toDeva('tasmān'), 'तस्मान्');
+  for (const v of DOC) assert.doesNotMatch(toDeva(v.sk), /[a-zāīūṛṝḷṃḥśṣṇṭḍñṅ]/, 'verse ' + v.id + ' left Latin letters');
+});

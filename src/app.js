@@ -5,6 +5,7 @@ import * as store from './store.js';
 import * as rec from './recorder.js';
 import {DECKS} from './words.js';
 import {spans} from './align.js';
+import * as speech from './speech.js';
 
 const {DAY, INTERVALS, levelOf} = store;
 const V = DOC;
@@ -52,11 +53,24 @@ function lightUp(box, idxs) {
   const v = byId(+box.dataset.verse), parts = partsOf(v.sk), sp = spans(v.id, v.en);
   line.innerHTML = [...new Set(idxs.map(i => parts[i]))].map(p => {
     const i = parts.indexOf(p), g = GLOSS[keyOf(p)];
-    return '<b lang="sa-Latn">' + esc(p) + '</b>' + (g ? ' = ' + esc(g) : '') + (sp[i].length ? '' : ' <span class="muted">(not in this English translation)</span>');
+    return '<b lang="sa-Latn">' + esc(p) + '</b> ' + hearWord(p) + (g ? ' = ' + esc(g) : '') + (sp[i].length ? '' : ' <span class="muted">(not in this English translation)</span>');
   }).join(' · ');
 }
 
 const levelLabel = {new: 'New', learning: 'Learning', known: 'Known'};
+
+/* Hear buttons: kind v = a verse (ref is its id), w = a word (ref is the text), r = verses "from-to". */
+const RATES = {slow: .65, normal: .9};
+const hearBtn = (kind, ref, label) => speech.canSpeak ? '<button class="btn hear" data-act="hear" data-k="' + kind + '" data-r="' + esc(ref) + '">🔊 ' + (label || 'Hear') + '</button>' : '';
+const hearWord = p => speech.canSpeak ? '<button class="hearw" data-act="hear" data-k="w" data-r="' + esc(p) + '" aria-label="Hear ' + esc(p) + '">🔊</button>' : '';
+function hear(kind, ref) {
+  if (speech.speaking()) { speech.stop(); return; }
+  let lines;
+  if (kind === 'v') lines = [byId(+ref).sk];
+  else if (kind === 'r') { const [a, b] = ref.split('-').map(Number); lines = V.filter(v => v.id >= a && v.id <= b).map(v => v.sk); }
+  else lines = ref.split(' / ');
+  speech.speak(lines, lines.map(pronText), RATES[S().hearRate] || RATES.slow);
+}
 
 /* The verses that come before v, enough of them that the cue points to only one place in the text. */
 function contextFor(v) {
@@ -130,6 +144,7 @@ function leafHTML(v, opts) {
     '<div class="leaf-top"><span>Verse ' + v.id + '</span><span>' + levelLabel[lvl] + (store.meaningLevel(v.id) === 'known' ? ' · can translate' : '') + '</span></div>' +
     '<p class="sk" lang="sa-Latn">' + tapSk(v, sh.len) + '</p>' +
     (sh.pron ? '<p class="pron">' + esc(pronText(v.sk)) + '</p>' : '') +
+    '<div class="row" style="margin:6px 0 0">' + hearBtn('v', v.id) + '</div>' +
     (sh.en ? '<p class="en">' + tapEn(v) + '</p>' : '') + '<p class="tapgloss" aria-live="polite"></p>' +
     (v.lc ? '<p class="note">Translation uncertain: some words here are obscure.</p>' : '') +
     (sh.words ? tilesHTML(v.sk) : '') +
@@ -144,6 +159,7 @@ function viewLearn() {
   V.forEach(v => { if (v.sec !== cur) { cur = v.sec; body += '<h3 class="sec">' + esc(SECTIONS[cur]) + '</h3>'; } body += leafHTML(v); });
   return '<details class="about"><summary>About this text</summary><p>This is the text from your printed study document, taught exactly as printed: the longer version of the Nīlakaṇṭha Dhāraṇī, written in IAST, the scholarly way of spelling Sanskrit with marks such as ā, ś and ṛ. Verses marked "translation uncertain" contain words that are obscure even to scholars.</p></details>' +
     '<div class="chips"><span class="small muted">Show:</span>' + chip('len', 'Long sounds') + chip('pron', 'Pronunciation') + chip('words', 'Word by word') + chip('en', 'English') + '</div>' +
+    (speech.canSpeak ? '<div class="chips"><span class="small muted">Voice speed:</span>' + seg('hrate', S().hearRate, [['slow', 'Slow'], ['normal', 'Normal']], 'Voice speed') + '</div>' : '') +
     '<p class="small muted" style="margin:-6px 0 8px">Tap any Sanskrit word to see the English it becomes, or tap the English to find its Sanskrit.</p>' +
     (S().show.len ? '<p class="small muted" style="margin:-6px 0 14px">Underlined: long vowels, held about twice as long. Dotted: doubled consonants, held one beat. See the Sounds tab.</p>' : '') +
     '<div class="stack">' + body + '</div>';
@@ -234,7 +250,7 @@ function viewPractice() {
   if (P.stage === 'reveal') {
     return bar + head + '<div class="card"><p class="prompt-label">The verse</p><div class="res" lang="sa-Latn">' + marked(v.sk, null, true) + '</div>' +
       '<p class="pron">' + esc(pronText(v.sk)) + '</p>' + (willTranslate(it) ? '' : '<p class="en">' + esc(v.en) + '</p>') +
-      recBar('p-' + v.id) +
+      '<div class="row" style="margin-top:6px">' + hearBtn('v', v.id, 'Hear it') + '</div>' + recBar('p-' + v.id) +
       '<p class="prompt-label" style="margin-top:14px">How did it go?</p><div class="rate"><button class="btn miss" data-act="rate" data-o="miss">Missed</button><button class="btn close" data-act="rate" data-o="close">Shaky</button><button class="btn perfect" data-act="rate" data-o="perfect">Got it</button></div>' +
       '<p class="small muted" style="margin:8px 0 0">Got it: every word, in order, with long sounds held. Shaky: you got there, with pauses or a slip.</p></div>';
   }
@@ -246,7 +262,7 @@ function viewPractice() {
     (g.gaveUp ? '' : '<div class="legend"><span><i style="background:var(--good-soft)"></i>matched</span><span><i style="background:var(--warn-soft)"></i>nearly</span><span><i style="background:var(--bad-soft)"></i>missed</span></div>') +
     (g.gaveUp || !P.typed.trim() ? '' : '<p class="typed">You typed: ' + esc(P.typed) + '</p>') +
     (g.extra ? '<p class="small muted" style="margin:0 0 6px">Every word matched, but you typed extra letters or words around the verse.</p>' : '') +
-    '<p class="pron">' + esc(pronText(shown)) + '</p>' + (willTranslate(it) ? '' : '<p class="en">' + esc(v.en) + '</p>') +
+    '<p class="pron">' + esc(pronText(shown)) + '</p>' + '<div class="row" style="margin:6px 0">' + hearBtn('v', v.id, 'Hear it') + '</div>' + (willTranslate(it) ? '' : '<p class="en">' + esc(v.en) + '</p>') +
     (g.said ? '<p class="small muted" style="margin:10px 0 0">Said aloud: ' + {perfect: 'got it', close: 'shaky', miss: 'missed'}[g.said] + ' · Written: ' + {perfect: 'perfect', close: 'close', miss: 'not yet'}[g.outcome] + '. Scheduled by the weaker of the two.</p>' : '') +
     '<p class="small muted" style="margin:10px 0 12px">Next review in ' + fmtWait(P.wait) + (g.outcome === 'miss' ? '. It will come back at the end of this session.' : '.') + '</p>' +
     '<div class="row"><button class="btn primary" id="next" data-act="next">' + (willTranslate(it) ? 'Translate it' : P.idx + 1 >= P.queue.length ? 'Finish' : P.queue[P.idx + 1].drill ? 'Try writing it again' : 'Next verse') + '</button></div></div>';
@@ -270,7 +286,7 @@ function translateHTML(v) {
     '<div class="row" style="margin-top:10px"><button class="btn primary" data-act="tr-show">Show the meaning</button><button class="btn quiet" data-act="tr-skip">Skip</button></div></div>';
   const cov = P.trText.trim() ? coverage(v, P.trText) : [];
   return h + (P.trText.trim() ? '<p class="typed">You wrote: ' + esc(P.trText) + '</p>' : '') +
-    '<p class="prompt-label" style="margin-top:12px">Translation</p><p class="en" style="font-size:1.1rem;margin-top:0">' + tapEn(v) + '</p><p class="tapgloss" aria-live="polite"><span class="muted">Tap a word, Sanskrit or English, to see which words match.</span></p>' +
+    '<p class="prompt-label" style="margin-top:12px">Translation</p><p class="en" style="font-size:1.1rem;margin-top:0">' + tapEn(v) + '</p><div class="row" style="margin:6px 0">' + hearBtn('v', v.id, 'Hear it') + '</div><p class="tapgloss" aria-live="polite"><span class="muted">Tap a word, Sanskrit or English, to see which words match.</span></p>' +
     (v.lc ? '<p class="note">Translation uncertain: some words here are obscure.</p>' : '') +
     (cov.length ? '<p class="prompt-label" style="margin-top:12px">Key words (rough check)</p><div class="chips">' + cov.map(c => '<span class="chip cov' + (c.ok ? ' ok' : '') + '" style="cursor:default"><span lang="sa-Latn">' + esc(c.p) + '</span> · ' + esc(c.g) + '</span>').join('') + '</div>' : '') +
     tilesHTML(v.sk) +
@@ -373,14 +389,14 @@ function viewWords() {
   const bar = '<div class="bar" aria-hidden="true"><i style="width:' + Math.round(W.idx / W.queue.length * 100) + '%"></i></div>';
   const head = '<div class="row" style="justify-content:space-between;margin:0 0 8px"><span class="small muted">Word ' + (W.idx + 1) + ' of ' + W.queue.length + (it.retry ? ' · second try' : '') + '</span><button class="btn quiet small" data-act="w-end">End</button></div>';
   const front = sk2en
-    ? '<p class="prompt-label">What does it mean?</p><p class="sk" lang="sa-Latn" style="margin:0">' + esc(c.sk) + '</p><p class="pron">' + esc(pronOf(c)) + '</p>'
+    ? '<p class="prompt-label">What does it mean?</p><p class="sk" lang="sa-Latn" style="margin:0">' + esc(c.sk) + ' ' + hearWord(c.sk) + '</p><p class="pron">' + esc(pronOf(c)) + '</p>'
     : '<p class="prompt-label">Which Sanskrit word means</p><p class="prompt-body" style="font-size:1.4rem">' + esc(c.en) + '</p>';
   const opts = '<div class="opts">' + W.options.map(k => {
     const o = cardBy(k), cls = a ? (k === c.key ? ' right' : k === a.pick ? ' wrong' : '') : '';
     return '<button class="btn opt' + cls + '" data-act="w-pick" data-k="' + esc(k) + '"' + (a ? ' disabled' : '') + (sk2en ? '' : ' lang="sa-Latn"') + '>' + esc(sk2en ? o.en : o.sk) + '</button>';
   }).join('') + '</div>';
   const back = !a ? '' : '<div style="margin-top:14px"><span class="verdict ' + (a.right ? 'perfect' : 'miss') + '">' + (a.right ? 'Right' : 'Not quite') + '</span>' +
-    '<p style="margin:4px 0"><b lang="sa-Latn" style="font-family:var(--serif);font-size:1.2rem">' + esc(c.sk) + '</b> <span class="pron" style="display:inline">' + esc(pronOf(c)) + '</span> = ' + esc(c.en) + '</p>' +
+    '<p style="margin:4px 0"><b lang="sa-Latn" style="font-family:var(--serif);font-size:1.2rem">' + esc(c.sk) + '</b> <span class="pron" style="display:inline">' + esc(pronOf(c)) + '</span> ' + hearWord(c.sk) + ' = ' + esc(c.en) + '</p>' +
     (c.note ? '<p class="small muted" style="margin:0 0 6px">' + esc(c.note) + '</p>' : '') +
     '<p class="prompt-label" style="margin-top:10px">In the dhāraṇī</p>' + seenIn(c, 3) +
     '<div class="row" style="margin-top:12px"><button class="btn primary" id="next" data-act="w-next">' + (W.idx + 1 >= W.queue.length ? 'Finish' : 'Next word') + '</button></div></div>';
@@ -421,7 +437,7 @@ function viewRecite() {
   if (R.hints) h += '<div class="card" style="background:var(--bg)"><p class="prompt-label">First letters</p>' + verses.map(v => '<div class="hint" style="margin:2px 0;font-size:1.05rem">' + esc(hintText(v, 1)) + '</div>').join('') + '</div>';
 
   if (say) {
-    if (R.phase === 'ready') h += '<button class="btn primary" data-act="r-start">Start reciting verses ' + from + ' to ' + to + '</button>' + paceHTML(from, to);
+    if (R.phase === 'ready') h += '<div class="row"><button class="btn primary" data-act="r-start">Start reciting verses ' + from + ' to ' + to + '</button>' + hearBtn('r', from + '-' + to, 'Hear these verses') + '</div>' + paceHTML(from, to);
     else if (R.phase === 'running') h += '<div class="timer" id="timer">' + clock(Date.now() - R.t0) + '</div>' + (rec.recording() ? '<p class="small muted" style="text-align:center"><span class="dot"></span>Recording</p>' : '') +
       '<div class="row" style="justify-content:center"><button class="btn primary" data-act="r-done">Finished</button><button class="btn quiet" data-act="r-cancel">Cancel</button></div>';
     else {
@@ -513,7 +529,12 @@ function viewSounds() {
     ['ṇ  ṭ  ḍ', 'tongue curled back; ṇ sounds like n', 'kāruṇika, kaṇṭha'], ['ṃ', 'nasal hum, like m or ng', 'idaṃ'], ['ḥ', 'a light echo of the vowel', 'manaḥ is muh-nuh-huh'],
     ['tt  dd', 'a doubled consonant is held one beat longer', 'sattva, siddha'], ['v', 'between English v and w', 'sarva, vyādhi'], ['ñ  ṅ', 'n before c or g, like "inch", "ink"', 'muñca, śaṅkha']
   ];
-  return '<div class="card"><h2>Reading the marks</h2><p class="muted small" style="margin:0 0 8px;max-width:62ch">A short a is the biggest surprise for English speakers: it sounds like the u in "but", so sarva is "sur-vuh", not "sar-vah". A long ā is the open sound of "father". When you recite in a plain speaking voice, getting short and long vowels right is most of what makes the Sanskrit sound right: hold a long vowel about twice as long as a short one.</p>' +
+  const voice = !speech.canSpeak ? '<p class="muted small" style="margin:0">This browser cannot speak, so the Hear buttons are hidden.</p>'
+    : speech.voiceName() ? '<p class="muted small" style="margin:0 0 8px;max-width:62ch">Using the <b>' + esc(speech.voiceName()) + '</b> voice, reading the text in Devanagari script.</p>'
+    : '<p class="muted small" style="margin:0 0 8px;max-width:62ch">This device has no Hindi voice, so Hear reads the English respelling, which is only a rough guide. For a better voice, add Hindi under your device\'s text-to-speech or language settings, then reopen the app.</p>';
+  return '<div class="card"><h2>Hearing the text</h2>' + voice +
+    (speech.canSpeak ? '<p class="muted small" style="margin:0;max-width:62ch">No device has a Sanskrit voice, so Hear uses a Hindi one. It is a computer voice with a Hindi accent: it may drop a short a at the end of a word (sarva can sound like "sarv"), and its rhythm is not a reciter\'s. Use it to check the sounds of a word, and follow your teacher or tradition where they differ.</p><div class="row" style="margin-top:10px">' + hearBtn('v', 1, 'Try it: verse 1') + '</div>' : '') + '</div>' +
+    '<div class="card"><h2>Reading the marks</h2><p class="muted small" style="margin:0 0 8px;max-width:62ch">A short a is the biggest surprise for English speakers: it sounds like the u in "but", so sarva is "sur-vuh", not "sar-vah". A long ā is the open sound of "father". When you recite in a plain speaking voice, getting short and long vowels right is most of what makes the Sanskrit sound right: hold a long vowel about twice as long as a short one.</p>' +
     '<p class="muted small" style="margin:0;max-width:62ch">Turn on <b>Long sounds</b> in the Learn tab to see every long vowel <span class="long">underlined</span> and every doubled consonant <span class="gem">dotted</span>. The pronunciation lines are an automatic English respelling, so treat them as a guide and follow your teacher or tradition where they differ.</p></div>' +
     '<div class="sound-grid">' + items.map(i => '<div class="snd"><div class="g" lang="sa-Latn">' + esc(i[0]) + '</div><div class="d">' + esc(i[1]) + '</div><div class="e" lang="sa-Latn">' + esc(i[2]) + '</div></div>').join('') + '</div>';
 }
@@ -549,6 +570,8 @@ document.addEventListener('click', async e => {
   if (act !== 'clear-mistakes') P.confirmClear = false;
   const keepTyped = () => { const a = $('#ans'); if (a) P.typed = a.value; const r = $('#recital'); if (r) R.text = r.value; };
   switch (act) {
+    case 'hear': hear(t.dataset.k, t.dataset.r); break;
+    case 'hrate': S().hearRate = t.dataset.v; store.save(); { const y = scrollY; render(); scrollTo(0, y); } break;
     case 'tapw': case 'tape': {
       const box = t.closest('[data-verse]'); if (!box) break;
       const idxs = act === 'tapw' ? [+t.dataset.i] : t.dataset.ps.split(' ').map(Number);

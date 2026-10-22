@@ -12,6 +12,9 @@ your device.
   underlined and doubled consonants dotted, because holding them is most of what makes spoken Sanskrit
   sound right.
   Tap any Sanskrit word to highlight the English it becomes, or tap the English to find its Sanskrit.
+  **Hear** reads a verse or word aloud with the device's speech voice: a Hindi voice reading the text
+  converted to Devanagari (no device has a Sanskrit voice), or the English respelling where there is no
+  Hindi voice. Slow or normal speed. It is a guide to the sounds, not a recording of a reciter.
 - **Practice**: spaced repetition, one verse at a time. By default the cue is the verse before (with
   more lines when one line is not enough to tell where you are), and you **say** the verse aloud,
   reveal it, and rate yourself Missed, Shaky or Got it. You can also type answers, which are graded
@@ -64,5 +67,6 @@ When you change any app file, bump `VERSION` in `sw.js` so installed copies pick
 | `src/pron.js` | Pronunciation respelling and long-sound marking |
 | `src/align.js` | Which words of each verse's English translate each Sanskrit word |
 | `src/words.js` | The word learner's decks |
+| `src/speech.js`, `src/translit.js` | Hear buttons: speech voice, and IAST to Devanagari |
 | `src/recorder.js` | Recording yourself with the microphone |
 | `sw.js`, `manifest.webmanifest`, `icons/` | Offline support and installing |
