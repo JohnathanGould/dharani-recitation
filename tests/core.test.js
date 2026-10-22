@@ -1,0 +1,48 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {DOC} from '../src/data.js';
+import {gradeSeq} from '../src/grade.js';
+import {pronText, lengthHTML} from '../src/pron.js';
+
+const parts = sk => sk.split(/\s+/).flatMap(w => w.split('-')).filter(Boolean);
+const one = v => [[v.sk].concat(v.alts || []).map(parts)];
+const esc = s => s;
+
+test('the text has 70 verses with unique ids', () => {
+  assert.equal(DOC.length, 70);
+  assert.deepEqual(DOC.map(v => v.id), DOC.map((_, i) => i + 1));
+});
+
+test('typing a verse exactly is perfect, with or without diacritics', () => {
+  const v = DOC[1];
+  assert.equal(gradeSeq(v.sk, one(v), true).exact, true);
+  assert.equal(gradeSeq('nama aryavalokitesvaraya bodhisattvaya', one(v), false).exact, true);
+});
+
+test('common respellings are accepted in lenient mode', () => {
+  const v = DOC[4]; // sarva bhava samudraṃ śoṣaṇa-karāya
+  assert.equal(gradeSeq('sarva bhava samoodram shoshana karaya', one(v), false).exact, true);
+});
+
+test('alternate readings are accepted', () => {
+  const v = DOC[6]; // mṛtyu, or Chandra's sarv-ety-upadrava
+  assert.equal(gradeSeq('sarv ety upadrava vinasana karaya', one(v), false).exact, true);
+});
+
+test('a missing word is marked as missed', () => {
+  const v = DOC[3]; // sarva bandhana chedana-karāya
+  const r = gradeSeq('sarva chedana karaya', one(v), false);
+  assert.equal(r.exact, false);
+  assert.deepEqual(r.picks[0].marks, ['ok', 'miss', 'ok', 'ok']);
+});
+
+test('pronunciation respelling', () => {
+  assert.equal(pronText('namo ratna-trayāya'), 'nuh-moh  rut-nuh truh-yah-yuh');
+});
+
+test('long sounds are marked', () => {
+  assert.equal(lengthHTML('karāya', esc), 'kar<span class="long">ā</span>ya');
+  assert.equal(lengthHTML('sattva', esc), 'sa<span class="gem">tt</span>va');
+  assert.equal(lengthHTML('cchedana', esc), '<span class="gem">cch</span><span class="long">e</span>dana');
+  assert.equal(lengthHTML('maitrī', esc), 'm<span class="long">ai</span>tr<span class="long">ī</span>');
+});

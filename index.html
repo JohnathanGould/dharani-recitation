@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Dhāraṇī Recitation</title>
+<meta name="description" content="Learn the Great Compassionate Dhāraṇī (Nīlakaṇṭha Dhāraṇī) for recitation: study each verse, practise saying it aloud, and build up a full recital from memory.">
+<meta name="theme-color" content="#E9EDF4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0C1224" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Dhāraṇī">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Gentium+Plus:ital,wght@0,400;0,700;1,400&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="kicker" id="kicker"></div>
+      <h1>Great Compassionate Dharani</h1>
+      <p class="sub">Learn each verse, practise saying it aloud, then recite it from memory.</p>
+    </div>
+    <div class="meter" id="meter" aria-live="polite"></div>
+  </header>
+  <nav class="tabs" role="tablist" id="tabs">
+    <button class="tab" role="tab" data-tab="learn">Learn</button>
+    <button class="tab" role="tab" data-tab="practice">Practice</button>
+    <button class="tab" role="tab" data-tab="recite">Recite</button>
+    <button class="tab" role="tab" data-tab="spelling">Spelling</button>
+    <button class="tab" role="tab" data-tab="sounds">Sounds</button>
+    <button class="tab" role="tab" data-tab="sources">Sources</button>
+  </nav>
+  <main id="view"></main>
+  <p class="offline">Works offline once loaded. Your progress stays on this device.</p>
+</div>
+<noscript><p style="padding:16px">This app needs JavaScript.</p></noscript>
+<script type="module" src="src/app.js"></script>
+</body>
+</html>
