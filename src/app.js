@@ -57,7 +57,7 @@ function lightUp(box, idxs) {
   }).join(' · ');
 }
 
-const levelLabel = {new: 'New', learning: 'Learning', known: 'Known'};
+const levelLabel = {new: 'New', learning: 'Learning', known: 'Mastered'};
 
 /* Hear buttons: kind v = a verse (ref is its id), w = a word (ref is the text), r = verses "from-to". */
 const RATES = {slow: .65, normal: .9};
@@ -122,9 +122,9 @@ function recBar(key, label) {
 /* ---------- Header ---------- */
 function renderMeter() {
   const known = V.filter(v => levelOf(v.id) === 'known').length, s = store.streak();
-  $('#meter').innerHTML = '<div class="strip" role="img" aria-label="' + known + ' of ' + V.length + ' verses known">' +
+  $('#meter').innerHTML = '<div class="strip" role="img" aria-label="' + known + ' of ' + V.length + ' verses mastered">' +
     V.map(v => '<i data-level="' + levelOf(v.id) + '"></i>').join('') + '</div>' +
-    '<div>' + known + ' of ' + V.length + ' verses known' + (s ? ' · ' + s + '-day streak' : '') + '</div>';
+    '<div>' + known + ' of ' + V.length + ' verses mastered' + (s ? ' · ' + s + '-day streak' : '') + '</div>';
 }
 function renderTabs() { document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab))); }
 
@@ -150,7 +150,7 @@ function leafHTML(v, opts) {
     (sh.words ? tilesHTML(v.sk) : '') +
     (opts.noActions ? '' : recBar('learn-' + v.id, 'Record yourself reading it') +
       '<div class="actions"><button class="btn quiet" data-act="practice-line" data-id="' + v.id + '">Practice this verse</button></div>' +
-      '<div class="chips" style="margin:10px 0 0"><span class="small muted">Mark as:</span>' + [['new', 'New'], ['learning', 'Learning'], ['known', 'Known']].map(x => '<button class="chip" data-act="set-level" data-id="' + v.id + '" data-lv="' + x[0] + '" aria-pressed="' + (lvl === x[0]) + '">' + x[1] + '</button>').join('') + '</div>') +
+      '<div class="chips" style="margin:10px 0 0"><span class="small muted">Mark as:</span>' + [['new', 'New'], ['learning', 'Learning'], ['known', 'Mastered']].map(x => '<button class="chip" data-act="set-level" data-id="' + v.id + '" data-lv="' + x[0] + '" aria-pressed="' + (lvl === x[0]) + '">' + x[1] + '</button>').join('') + '</div>') +
     '</article>';
 }
 function viewLearn() {
@@ -363,8 +363,12 @@ function startWords(cards) {
   Object.assign(W, {active: true, queue: cards.map(c => ({key: c.key, retry: false})), idx: 0, results: []});
   dealCard(); go('words');
 }
-const wordDue = d => d.cards.filter(c => { const st = S().words[c.key]; return st && st.seen && st.due <= Date.now(); });
-const wordNew = d => d.cards.filter(c => !(S().words[c.key] && S().words[c.key].seen));
+/* Only words from verses you have started (Learning or Mastered) are quizzed, and never ones you marked mastered. */
+const unlocked = c => c.seen.some(o => levelOf(o.id) !== 'new');
+const quizzable = d => d.cards.filter(c => unlocked(c) && !store.wordMastered(c.key));
+const wordDue = d => quizzable(d).filter(c => { const st = S().words[c.key]; return st && st.seen && st.due <= Date.now(); });
+const wordNew = d => quizzable(d).filter(c => !(S().words[c.key] && S().words[c.key].seen));
+const masterBtn = c => '<button class="chip" data-act="w-master" data-k="' + esc(c.key) + '" aria-pressed="' + store.wordMastered(c.key) + '">' + (store.wordMastered(c.key) ? '✓ Mastered' : 'Mark mastered') + '</button>';
 function seenIn(c, max) {
   return c.seen.slice(0, max).map(o => {
     const v = byId(o.id), hits = new Set(o.hits);
@@ -375,14 +379,18 @@ function seenIn(c, max) {
 function viewWords() {
   const d = DECKS[S().wordDeck], sk2en = S().wordDir === 'sk2en';
   if (!W.active) {
-    const due = wordDue(d).length, nw = wordNew(d).length, known = d.cards.filter(c => store.wordLevel(c.key) === 'known').length;
-    const rows = d.cards.map(c => '<div class="wrow"><span class="lv" data-level="' + store.wordLevel(c.key) + '"></span><span><b lang="sa-Latn">' + esc(c.sk) + '</b> <span class="tp">' + esc(pronOf(c)) + '</span><br>' +
-      esc(c.en) + (c.note ? ' <span class="muted small">' + esc(c.note) + '</span>' : '') + ' <span class="muted small">· ' + c.seen.length + (c.seen.length === 1 ? ' verse' : ' verses') + '</span></span></div>').join('');
+    const due = wordDue(d).length, nw = wordNew(d).length, pool = quizzable(d).length;
+    const open = d.cards.filter(unlocked), mastered = d.cards.filter(c => store.wordMastered(c.key)).length;
+    const row = c => '<div class="wrow' + (unlocked(c) ? '' : ' locked') + '"><span class="lv" data-level="' + store.wordLevel(c.key) + '"></span><span style="flex:1"><b lang="sa-Latn">' + esc(c.sk) + '</b> <span class="tp">' + esc(pronOf(c)) + '</span><br>' +
+      esc(c.en) + (c.note ? ' <span class="muted small">' + esc(c.note) + '</span>' : '') + ' <span class="muted small">· ' + (unlocked(c) ? 'verse ' + c.seen.map(o => o.id).slice(0, 4).join(', ') + (c.seen.length > 4 ? '…' : '') : 'not in your verses yet') + '</span></span>' + masterBtn(c) + '</div>';
+    const rows = open.map(row).join('') + d.cards.filter(c => !unlocked(c)).map(row).join('');
     return '<div class="card"><h2>Word learner</h2><p class="muted small" style="margin:0 0 12px;max-width:62ch">Learn the words the dhāraṇī is made of. <b>Building blocks</b> are the roots that recur: once you know mahā is "great" and īśvara is "lord", mahākāruṇika and lokeśvara read themselves. <b>Words in the text</b> are the full words of your document, most frequent first.</p>' +
       '<div class="row" style="margin-bottom:10px">' + seg('wdeck', S().wordDeck, [['blocks', 'Building blocks'], ['text', 'Words in the text']], 'Deck') + '</div>' +
       '<div class="row" style="margin-bottom:14px">' + seg('wdir', S().wordDir, [['sk2en', 'Sanskrit → English'], ['en2sk', 'English → Sanskrit']], 'Direction') + '</div>' +
-      '<div class="stats"><div class="stat"><b>' + due + '</b><span>Due now</span></div><div class="stat"><b>' + nw + '</b><span>New</span></div><div class="stat"><b>' + known + ' / ' + d.cards.length + '</b><span>Known</span></div></div>' +
-      '<div class="row"><button class="btn primary" data-act="w-learn" ' + (due + nw ? '' : 'disabled style="opacity:.5"') + '>Learn words</button><button class="btn" data-act="w-all">Quiz 20 at random</button></div>' +
+      '<div class="stats"><div class="stat"><b>' + due + '</b><span>Due now</span></div><div class="stat"><b>' + nw + '</b><span>New</span></div><div class="stat"><b>' + mastered + '</b><span>Mastered</span></div></div>' +
+      '<p class="small muted" style="margin:0 0 10px;max-width:62ch">Quizzes use only words from verses you have marked Learning or Mastered (or practised): ' + open.length + ' of ' + d.cards.length + ' words so far. Words you mark mastered are left out.</p>' +
+      (open.length ? '' : '<p style="margin:0 0 10px">No words yet. In Learn, mark the verses you are working on as Learning, or practise them, and their words appear here.</p>') +
+      '<div class="row"><button class="btn primary" data-act="w-learn" ' + (due + nw ? '' : 'disabled style="opacity:.5"') + '>Learn words</button><button class="btn" data-act="w-all" ' + (pool ? '' : 'disabled style="opacity:.5"') + '>Quiz ' + Math.min(20, pool) + ' at random</button></div>' +
       '<p class="small muted" style="margin:8px 0 0">Learn words: everything due, then up to 8 new ones.</p></div>' +
       '<details class="card" ' + (d.cards.length <= 60 ? 'open' : '') + '><summary style="cursor:pointer;font-weight:600">All ' + d.cards.length + ' words in this deck</summary><div style="margin-top:10px">' + rows + '</div></details>';
   }
@@ -404,6 +412,7 @@ function viewWords() {
     '<p style="margin:4px 0"><b lang="sa-Latn" style="font-family:var(--serif);font-size:1.2rem">' + esc(c.sk) + '</b> <span class="pron" style="display:inline">' + esc(pronOf(c)) + '</span> ' + hearWord(c.sk) + ' = ' + esc(c.en) + '</p>' +
     (c.note ? '<p class="small muted" style="margin:0 0 6px">' + esc(c.note) + '</p>' : '') +
     '<p class="prompt-label" style="margin-top:10px">In the dhāraṇī</p>' + seenIn(c, 3) +
+    '<div class="row" style="margin-top:12px">' + masterBtn(c) + '<span class="small muted">Mastered words are not quizzed.</span></div>' +
     '<div class="row" style="margin-top:12px"><button class="btn primary" id="next" data-act="w-next">' + (W.idx + 1 >= W.queue.length ? 'Finish' : 'Next word') + '</button></div></div>';
   return bar + head + '<div class="card">' + front + opts + back + '</div>';
 }
@@ -633,7 +642,14 @@ document.addEventListener('click', async e => {
     case 'wdeck': S().wordDeck = t.dataset.v; store.save(); render(); break;
     case 'wdir': S().wordDir = t.dataset.v; store.save(); render(); break;
     case 'w-learn': { const d = DECKS[S().wordDeck]; startWords(wordDue(d).concat(wordNew(d).slice(0, 8))); break; }
-    case 'w-all': startWords(shuffle(DECKS[S().wordDeck].cards.slice()).slice(0, 20)); break;
+    case 'w-all': startWords(shuffle(quizzable(DECKS[S().wordDeck])).slice(0, 20)); break;
+    case 'w-master': {
+      const k = t.dataset.k, on = !store.wordMastered(k);
+      store.setWordMastered(k, on);
+      // Drop any later second try of a word just marked mastered.
+      if (on && W.active) W.queue = W.queue.filter((q, i) => i <= W.idx || q.key !== k);
+      { const y = scrollY; render(); scrollTo(0, y); } break;
+    }
     case 'w-pick': {
       if (W.answered) break;
       const it = W.queue[W.idx], right = t.dataset.k === it.key;

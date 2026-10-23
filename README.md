@@ -27,6 +27,8 @@ your device.
 - **Words**: a word learner with two decks. *Building blocks* are the 54 roots that recur (mahā = great,
   sarva = all, īśvara = lord…); *Words in the text* are the full glossed words. Multiple-choice quizzes in
   either direction, with their own spaced review, and every card shows the verses it appears in.
+  Quizzes use only words from verses you have marked Learning or Mastered (or practised), and you can
+  mark a word mastered to stop quizzing it.
 - **Recite**: *Build the chain* recites from a start verse to the end of your chain; a clean recital adds
   the next verse. Recitals are timed, you mark the verses you stumbled on, and the app shows where you
   stumble most and lets you practise that step.

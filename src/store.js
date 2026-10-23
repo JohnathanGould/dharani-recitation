@@ -70,8 +70,14 @@ export function setLevel(id, lv) {
   save();
 }
 
-/* Word cards have their own boxes: right moves a card up, wrong sends it back to the start. */
-export const wordLevel = key => { const st = S.words[key]; if (!st || !st.seen) return 'new'; return st.box >= 3 ? 'known' : 'learning'; };
+/* Word cards have their own boxes: right moves a card up, wrong sends it back to the start.
+   A word you mark as mastered is no longer quizzed. */
+export const wordLevel = key => { const st = S.words[key]; if (st && st.mastered) return 'mastered'; if (!st || !st.seen) return 'new'; return st.box >= 3 ? 'known' : 'learning'; };
+export const wordMastered = key => !!(S.words[key] && S.words[key].mastered);
+export function setWordMastered(key, on) {
+  const st = S.words[key] || (S.words[key] = {box: 0, due: 0, seen: false});
+  st.mastered = on; save();
+}
 export function applyWord(key, correct) {
   const st = S.words[key] || (S.words[key] = {box: 0, due: 0, seen: false});
   st.seen = true; st.box = correct ? Math.min(5, st.box + 1) : 0;

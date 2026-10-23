@@ -222,3 +222,7 @@ details.card > summary { list-style-position: inside; }
 /* hear buttons */
 .btn.hear { padding: 6px 12px; font-size: .9rem; }
 .hearw { border: 0; background: none; cursor: pointer; padding: 0 2px; font-size: .95rem; vertical-align: baseline; }
+
+.wrow .chip { flex: none; align-self: center; }
+.wrow.locked { opacity: .55; }
+.lv[data-level="mastered"] { background: var(--good); border-color: var(--good); box-shadow: 0 0 0 3px var(--good-soft); }
