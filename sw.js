@@ -1,7 +1,7 @@
 /* Offline support: the app files are cached on install. When online, the app's own files come from the
    network (so an update shows on the next open) and refresh the cache; offline, the cache answers.
    Fonts are served cache-first. Bump VERSION when shipping changes so old caches are cleared. */
-const VERSION = 'v9';
+const VERSION = 'v10';
 const APP = ['./', 'index.html', 'styles.css', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png',
   'src/app.js', 'src/data.js', 'src/grade.js', 'src/pron.js', 'src/store.js', 'src/recorder.js', 'src/words.js', 'src/align.js', 'src/speech.js', 'src/translit.js'];
 

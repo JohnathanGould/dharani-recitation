@@ -61,6 +61,7 @@ const levelLabel = {new: 'New', learning: 'Learning', known: 'Mastered'};
 
 /* Hear buttons: kind v = a verse (ref is its id), w = a word (ref is the text), r = verses "from-to". */
 const RATES = {slow: .65, normal: .9};
+/* kind t = any IAST text (ref is the text). */
 const hearBtn = (kind, ref, label) => speech.canSpeak ? '<button class="btn hear" data-act="hear" data-k="' + kind + '" data-r="' + esc(ref) + '">🔊 ' + (label || 'Hear') + '</button>' : '';
 const hearWord = p => speech.canSpeak ? '<button class="hearw" data-act="hear" data-k="w" data-r="' + esc(p) + '" aria-label="Hear ' + esc(p) + '">🔊</button>' : '';
 function hear(kind, ref) {
@@ -69,7 +70,8 @@ function hear(kind, ref) {
   if (kind === 'v') lines = [byId(+ref).sk];
   else if (kind === 'r') { const [a, b] = ref.split('-').map(Number); lines = V.filter(v => v.id >= a && v.id <= b).map(v => v.sk); }
   else lines = ref.split(' / ');
-  speech.speak(lines, lines.map(pronText), RATES[S().hearRate] || RATES.slow);
+  if (kind === 't') lines = [ref];
+  speech.speak(lines, lines.map(pronText), RATES[S().hearRate] || RATES.slow, S().voiceStyle);
 }
 
 /* The verses that come before v, enough of them that the cue points to only one place in the text. */
@@ -547,7 +549,10 @@ function viewSounds() {
     : speech.voiceName() ? '<p class="muted small" style="margin:0 0 8px;max-width:62ch">Using the <b>' + esc(speech.voiceName()) + '</b> voice, reading the text in Devanagari script.</p>'
     : '<p class="muted small" style="margin:0 0 8px;max-width:62ch">This device has no Hindi voice, so Hear reads the English respelling, which is only a rough guide. For a better voice, add Hindi under your device\'s text-to-speech or language settings, then reopen the app.</p>';
   return '<div class="card"><h2>Hearing the text</h2>' + voice +
-    (speech.canSpeak ? '<p class="muted small" style="margin:0;max-width:62ch">No device has a Sanskrit voice, so Hear uses a Hindi one. It is a computer voice with a Hindi accent: it may drop a short a at the end of a word (sarva can sound like "sarv"), and its rhythm is not a reciter\'s. Use it to check the sounds of a word, and follow your teacher or tradition where they differ.</p><div class="row" style="margin-top:10px">' + hearBtn('v', 1, 'Try it: verse 1') + '</div>' : '') + '</div>' +
+    (speech.canSpeak ? '<p class="muted small" style="margin:0 0 10px;max-width:62ch">No device has a Sanskrit voice, so Hear uses a Hindi one, with a Hindi accent. Hindi leaves a short a silent at the end of a word and often in the middle, so read normally it says "sarv" for sarva and "prashman" for praśamana. <b>Syllables</b> reads the text one syllable at a time (sar-va), which keeps every vowel but sounds a little choppy.</p>' +
+      (speech.voiceName() ? '<p class="small muted" style="margin:0 0 6px">Voice style</p>' + seg('vstyle', S().voiceStyle, [['syll', 'Syllables'], ['natural', 'Natural'], ['english', 'English respelling']], 'Voice style') : '') +
+      '<div class="row" style="margin-top:10px">' + hearBtn('t', 'sarva bandhana chedana-karāya', 'Test: sarva bandhana chedana-karāya') + '</div>' +
+      '<p class="muted small" style="margin:10px 0 0;max-width:62ch">Try each style with the test line and keep the one that sounds closest to sar-va ban-dha-na che-da-na ka-rā-ya. It is still a computer voice: follow your teacher or tradition where they differ.</p>' : '') + '</div>' +
     '<div class="card"><h2>Reading the marks</h2><p class="muted small" style="margin:0 0 8px;max-width:62ch">A short a is the biggest surprise for English speakers: it sounds like the u in "but", so sarva is "sur-vuh", not "sar-vah". A long ā is the open sound of "father". When you recite in a plain speaking voice, getting short and long vowels right is most of what makes the Sanskrit sound right: hold a long vowel about twice as long as a short one.</p>' +
     '<p class="muted small" style="margin:0;max-width:62ch">Turn on <b>Long sounds</b> in the Learn tab to see every long vowel <span class="long">underlined</span> and every doubled consonant <span class="gem">dotted</span>. The pronunciation lines are an automatic English respelling, so treat them as a guide and follow your teacher or tradition where they differ.</p></div>' +
     '<div class="sound-grid">' + items.map(i => '<div class="snd"><div class="g" lang="sa-Latn">' + esc(i[0]) + '</div><div class="d">' + esc(i[1]) + '</div><div class="e" lang="sa-Latn">' + esc(i[2]) + '</div></div>').join('') + '</div>';
@@ -585,6 +590,7 @@ document.addEventListener('click', async e => {
   const keepTyped = () => { const a = $('#ans'); if (a) P.typed = a.value; const r = $('#recital'); if (r) R.text = r.value; };
   switch (act) {
     case 'hear': hear(t.dataset.k, t.dataset.r); break;
+    case 'vstyle': S().voiceStyle = t.dataset.v; store.save(); { const y = scrollY; render(); scrollTo(0, y); } break;
     case 'hrate': S().hearRate = t.dataset.v; store.save(); { const y = scrollY; render(); scrollTo(0, y); } break;
     case 'tapw': case 'tape': {
       const box = t.closest('[data-verse]'); if (!box) break;

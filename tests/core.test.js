@@ -79,3 +79,12 @@ test('IAST is converted to Devanagari for the speech voice', async () => {
   assert.equal(toDeva('tasmān'), 'तस्मान्');
   for (const v of DOC) assert.doesNotMatch(toDeva(v.sk), /[a-zāīūṛṝḷṃḥśṣṇṭḍñṅ]/, 'verse ' + v.id + ' left Latin letters');
 });
+
+test('the voice gets syllables so a Hindi voice keeps every short a', async () => {
+  const {toDevaSyllables} = await import('../src/translit.js');
+  assert.equal(toDevaSyllables('sarva'), 'सर्-व');
+  assert.equal(toDevaSyllables('praśamana'), 'प्र-श-म-न');
+  assert.equal(toDevaSyllables('bodhisattvāya'), 'बो-धि-सत्-त्वा-य');
+  assert.equal(toDevaSyllables('sarva bandhana chedana-karāya'), 'सर्-व बन्-ध-न छे-द-न-क-रा-य');
+  for (const v of DOC) assert.doesNotMatch(toDevaSyllables(v.sk), /[a-zāīūṛṝḷṃḥśṣṇṭḍñṅ]/, 'verse ' + v.id);
+});

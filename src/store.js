@@ -10,7 +10,7 @@ const defaults = () => ({
   days: [], lines: {}, newToday: {date: '', n: 0}, recent: {},
   chain: {from: 1, to: 2}, recitals: [], stumbles: {},
   words: {}, wordDeck: 'blocks', wordDir: 'sk2en',
-  translate: true, meaning: {}, hearRate: 'slow'
+  translate: true, meaning: {}, hearRate: 'slow', voiceStyle: 'syll'
 });
 function merge(st) {
   // Accept the original study tool's layout too, where progress sat under books.doc.
@@ -34,7 +34,7 @@ export function importJSON(text) {
   S = merge(st); save();
 }
 export function resetProgress() {
-  const keep = {strict: S.strict, newPerDay: S.newPerDay, answer: S.answer, prompt: S.prompt, show: S.show, recRecital: S.recRecital, wordDeck: S.wordDeck, wordDir: S.wordDir, translate: S.translate, hearRate: S.hearRate};
+  const keep = {strict: S.strict, newPerDay: S.newPerDay, answer: S.answer, prompt: S.prompt, show: S.show, recRecital: S.recRecital, wordDeck: S.wordDeck, wordDir: S.wordDir, translate: S.translate, hearRate: S.hearRate, voiceStyle: S.voiceStyle};
   S = Object.assign(defaults(), keep); save();
 }
 

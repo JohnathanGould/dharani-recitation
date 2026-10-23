@@ -15,6 +15,8 @@ your device.
   **Hear** reads a verse or word aloud with the device's speech voice: a Hindi voice reading the text
   converted to Devanagari (no device has a Sanskrit voice), or the English respelling where there is no
   Hindi voice. Slow or normal speed. It is a guide to the sounds, not a recording of a reciter.
+  Because Hindi leaves a short a silent (sarva as "sarv"), the default voice style reads syllable by
+  syllable (sar-va); Sounds has a test line to compare it with the natural and English styles.
 - **Practice**: spaced repetition, one verse at a time. By default the cue is the verse before (with
   more lines when one line is not enough to tell where you are), and you **say** the verse aloud,
   reveal it, and rate yourself Missed, Shaky or Got it. You can also type answers, which are graded
